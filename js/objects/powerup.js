@@ -1,0 +1,31 @@
+import { POWERUP_META } from '../effects/powerup-effects.js';
+
+export class PowerUpItem {
+  constructor(x, y, type) {
+    this.x = x;
+    this.y = y;
+    this.r = 9;
+    this.type = type;
+    this.collected = false;
+  }
+
+  draw(ctx, elapsedTime) {
+    const meta = POWERUP_META[this.type];
+    const bob = Math.sin(elapsedTime * 3 + this.x) * 3;
+
+    ctx.fillStyle = meta.color;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y + bob, this.r, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.fillStyle = '#0B0F2B';
+    ctx.font = 'bold 10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('!', this.x, this.y + bob);
+  }
+}

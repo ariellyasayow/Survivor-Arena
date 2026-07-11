@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Survivor Arena</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div id="game-container">
+
+  <div id="hud">
+    <div id="hud-top">
+      <div id="lives"></div>
+      <div id="stage-label">Level 1/3</div>
+      <div id="timer">00:45</div>
+    </div>
+    <div id="hud-bottom">
+      <div id="score">Skor: 0</div>
+      <div id="xp-bar-track"><div id="xp-bar-fill"></div></div>
+    </div>
+  </div>
+
+  <canvas id="game-canvas" width="390" height="640"></canvas>
+
+  <div id="overlay">
+    <div id="overlay-title">Survivor Arena</div>
+    <div id="overlay-message">Kumpulkan poin, hindari &amp; hajar musuh, bertahan sampai waktu habis. Level terakhir akan gelap.</div>
+    <button id="overlay-button">Mulai</button>
+  </div>
+
+  <div id="touch-controls">
+    <div id="joystick-base"><div id="joystick-stick"></div></div>
+  </div>
+
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
