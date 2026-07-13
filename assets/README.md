@@ -1,95 +1,92 @@
 # Assets
 
-Sistem sprite sudah siap (`js/utils/assets.js`). Setiap entity (`Player`,
-`Enemy`, `PointItem`, `PowerUpItem`, `Projectile`, background) sudah dicoba
-pakai gambar dulu, dan **otomatis fallback ke bentuk primitif Canvas**
-(lingkaran/bentuk warna yang sekarang) kalau file gambarnya belum ada. Jadi
-kamu bisa nambahin aset satu per satu tanpa pernah bikin game error/blank.
+Sistem sprite + animasi sudah aktif (`js/utils/assets.js`). Setiap entity
+(`Player`, `Enemy`, `PointItem`, `PowerUpItem`, background) mencoba pakai
+sprite dulu, dan **otomatis fallback ke bentuk primitif Canvas** kalau file
+gambarnya belum ada — jadi game tidak pernah error walau aset belum lengkap.
 
-## Cara pakai
+## Struktur
 
-1. Siapkan gambar (lihat panduan bikin aset & optimasi di bawah).
-2. Simpan ke `assets/images/` dengan nama file **persis** seperti ini:
+- `assets-image/` — aset MENTAH dari artist (frame terpisah per animasi,
+  rotasi item, dll). Ini sumber, tidak dipakai langsung oleh game.
+- `spritesheets/` — sprite sheet **WebP** hasil olahan yang benar-benar
+  dipakai game, satu subfolder per objek. Dihasilkan dari `assets-image/`
+  oleh script build (lihat di bawah).
 
-   | File | Dipakai untuk | Ukuran sumber disarankan |
-   |---|---|---|
-   | `player.webp` | karakter pemain | 64×64 px |
-   | `enemy.webp` | musuh | 64×64 px |
-   | `point.webp` | koin/poin | 32×32 px |
-   | `powerup.webp` | ikon power-up (1 gambar dipakai utk semua tipe, diberi tint warna otomatis) | 40×40 px |
-   | `projectile.webp` | peluru | 20×20 px |
-   | `bg-tile.webp` | tekstur rumput/lantai (di-*tile*/diulang, bukan 1 gambar full-map) | 128×128 px, harus *seamless* (ujung kiri-kanan & atas-bawah nyambung) |
+### Folder sumber (`assets-image/object/`)
 
-3. Refresh game. Tidak perlu ubah kode apa pun — `js/utils/assets.js` akan
-   otomatis mendeteksi dan memakainya.
+Nama folder disamakan dengan objek di game:
 
-Kalau mau ganti path/nama file, edit `SPRITE_MANIFEST` di
-`js/utils/assets.js`.
+| Folder | Objek game | Isi |
+|---|---|---|
+| `player/` | player | animations (Running/firing/death) + idle |
+| `enemy1/` | Enemy tipe 1 (melee) | animations (Running/Death) |
+| `enemy2/` | Enemy tipe 2 (kamikaze ledakan) | Running + attack_death (per arah `west/`) |
+| `enemy3/` | Enemy tipe 3 (ranged/laser) | sheet 128px: `Walk`/`Attack`/`Dead` |
+| `coin/` | poin | `rotations/` (8 arah) |
+| `orb/` | power-up (non-nyawa) | `rotations/` (8 arah) |
+| `heart/` | power-up nyawa | `rotations/` (8 arah) |
+| `tree/` | pohon (obstacle) | `tree-sheet.png` (16 frame) |
+| `rock/` | batu (obstacle) | `brown1..3.png` |
 
-## Kenapa ukurannya sekecil itu?
+## Sprite sheet yang dipakai game (`assets/spritesheets/<objek>/`)
 
-World game ini cuma **390×640 px**, dan semua object di dalamnya kecil
-(radius 7–22 px). Karakter di layar cuma butuh ~30-50px persegi — sprite
-64×64 sudah lebih dari cukup untuk tampil tajam (termasuk di layar retina
-2x). Membuat sprite jauh lebih besar dari itu (misal 512×512) cuma
-menambah ukuran file & waktu decode tanpa manfaat visual apa pun, karena
-browser akan men-downscale-nya saat digambar.
+Semua sheet tersusun **horizontal** (frame berjejer kiri→kanan). Karakter
+digambar menghadap **West (kiri)**; hadap kanan otomatis di-*mirror* saat
+render. Nama file & jumlah frame harus cocok dengan `SPRITE_MANIFEST` di
+`js/utils/assets.js`:
 
-## Panduan optimasi gambar (biar seringan mungkin)
+| File | Isi | Frame | Mode animasi |
+|---|---|---|---|
+| `player/idle.webp` | player diam | 1 | statis |
+| `player/run.webp` | player lari | 4 | ping-pong (mulus, tidak patah) |
+| `player/firing.webp` | player menembak | 9 | loop saat menembak |
+| `player/death.webp` | player mati | 9 | once (sekali jalan) |
+| `enemy1/run.webp` | musuh tipe 1 lari | 9 | loop |
+| `enemy1/death.webp` | musuh tipe 1 mati | 9 | once |
+| `enemy2/run.webp` | musuh tipe 2 lari | 4 | loop |
+| `enemy2/attack.webp` | musuh tipe 2 ledakan/mati | 9 | once |
+| `enemy3/run.webp` | musuh tipe 3 jalan | 5 | loop |
+| `enemy3/attack.webp` | musuh tipe 3 menembak laser | 9 | loop (laser lepas di frame ~8) |
+| `enemy3/death.webp` | musuh tipe 3 mati | 3 | once |
+| `coin/spin.webp` | poin berputar | 8 | loop |
+| `orb/spin.webp` | power-up (non-nyawa) | 8 | loop |
+| `heart/spin.webp` | power-up nyawa | 8 | loop |
+| `tree/tree.webp` | pohon (obstacle) | 16 | ping-pong (ayunan) |
+| `rock/rock.webp` | batu (obstacle) | 1 | statis |
 
-### 1. Format: pakai WebP
+Total semua WebP saat ini **~51 KB** — sangat ringan.
 
-WebP biasanya 25–50% lebih kecil dari PNG dengan kualitas visual setara,
-dan tetap mendukung transparansi (alpha channel) — cocok untuk
-sprite karakter/enemy/item yang perlu background transparan.
+## Cara regenerate sprite sheet dari frame mentah
 
-Convert PNG/JPG ke WebP:
-- Online: [squoosh.app](https://squoosh.app) (drag-drop, preview kualitas vs ukuran real-time, gratis, jalan di browser).
-- CLI (kalau install `cwebp` dari Google): `cwebp -q 80 player.png -o player.webp`
+Kalau aset mentah di `assets-image/` berubah, jalankan ulang script build
+(butuh Python + Pillow: `python -m pip install Pillow`):
 
-Kalau butuh dukungan browser sangat lama (jarang relevan buat game baru),
-baru pertimbangkan simpan PNG sebagai fallback tambahan.
+```
+python tools/build_assets.py
+```
 
-### 2. Resize ke ukuran render asli — jangan upload aset mentah
+Script ini: menggabungkan tiap folder frame jadi 1 sheet horizontal,
+mengurutkan rotasi item supaya berputar mulus, meng-*convert* ke WebP
+(quality 82), dan menaruh hasilnya di `assets/spritesheets/<objek>/`.
+Idempotent — aman dijalankan berulang.
 
-Kalau aset dari asset pack/AI generator biasanya berukuran besar (512px,
-1024px, dst). Resize dulu ke ukuran yang benar-benar dipakai (lihat tabel
-di atas) sebelum convert ke WebP. Ini pengaruh paling besar ke ukuran
-file — mengecilkan 512px → 64px bisa memangkas ukuran file sampai 90%+.
+## Panduan optimasi (kalau nambah/ganti aset)
 
-### 3. Kompres losslessly kalau perlu presisi warna, lossy kalau tidak
+1. **WebP** untuk semua sprite — 25–50% lebih kecil dari PNG, tetap
+   mendukung transparansi. Convert via [squoosh.app](https://squoosh.app)
+   atau `cwebp -q 82`.
+2. **Resize ke ukuran render** — jangan pakai aset 512px untuk sprite yang
+   tampil ~50px. Frame player 64×64 & enemy 60×60 sudah cukup tajam.
+3. **Sprite sheet, bukan file terpisah** — gabung frame animasi jadi 1 file
+   horizontal supaya browser cuma 1 request per animasi.
+4. **Budget** — target total gambar < 200–300 KB. Sekarang jauh di bawah itu.
 
-Untuk sprite kecil dengan warna flat/kartun, kompresi lossy (kualitas
-75–85) biasanya tidak kelihatan bedanya tapi ukuran file jauh lebih
-kecil. Cek dulu hasilnya di Squoosh sebelum commit ke satu angka.
+## Cara kerja mirror & animasi (ringkas)
 
-### 4. Background: pakai tile kecil yang diulang, bukan 1 gambar full-map
-
-`bg-tile.webp` didesain untuk di-*tile* (diulang berkali-kali) mengisi
-seluruh area 390×640, mirip wallpaper. Ini jauh lebih ringan daripada
-bikin 1 file besar seukuran seluruh dunia — cukup 1 file 128×128px kecil,
-harus dibuat *seamless* (pola di tepi kiri/kanan dan atas/bawah harus
-nyambung mulus supaya tidak kelihatan garis sambungan saat diulang).
-
-### 5. Sprite sheet untuk animasi (opsional, kalau nanti nambah animasi jalan/mati)
-
-`js/utils/assets.js` sudah punya dukungan dasar sprite sheet horizontal
-(`frames`, `fw`, `fh` di `SPRITE_MANIFEST`, plus parameter `frameIndex` di
-`drawSprite`). Kalau nanti karakter butuh animasi (misal 4 frame jalan),
-gabung semua frame jadi 1 file sejajar horizontal (misal 256×64 untuk
-4 frame @64px) — ini bikin browser cuma perlu 1 request gambar untuk
-seluruh animasi, bukan 4 file terpisah.
-
-### 6. Total budget yang wajar
-
-Untuk game seringan ini, target total ukuran semua gambar di bawah
-~200–300 KB sudah sangat aman untuk load cepat bahkan di koneksi mobile
-pelan. Kalau pakai ukuran & tips di atas, biasanya kamu akan jauh di
-bawah itu (masing-masing file sprite kecil umumnya < 5-10 KB).
-
-## Kalau belum punya aset sama sekali
-
-Bisa cari base gratis lisensi CC0/permisif di situs seperti
-[Kenney.nl](https://kenney.nl) atau [OpenGameArt.org](https://opengameart.org)
-(banyak asset pack "top-down" atau "survivor-like" yang cocok), lalu ikuti
-langkah resize + convert WebP di atas sebelum dipakai.
+- `drawSprite(ctx, key, x, y, size, frameIndex, mirror)` — `mirror=true`
+  membalik horizontal (untuk hadap kanan/East).
+- `frameForClip(key, clipTime, fps, mode)` — hitung index frame dari waktu;
+  `mode`: `loop` | `pingpong` | `once`.
+- Player: `facingDir` (-1 kiri / +1 kanan) hanya berubah saat ada input
+  horizontal; gerak vertikal murni mempertahankan arah terakhir.

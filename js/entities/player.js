@@ -1,6 +1,9 @@
 import { clamp } from '../utils/helpers.js';
 import { WORLD_W, WORLD_H, OBSTACLES } from '../world/background.js';
-import { drawSprite } from '../utils/assets.js';
+import { drawSprite, frameForClip, spriteReady } from '../utils/assets.js';
+
+export const MAG_SIZE = 50;      // peluru per magazine
+export const RELOAD_TIME = 3;    // detik cooldown reload setelah magazine habis
 
 export class Player {
   constructor() {
@@ -19,11 +22,37 @@ export class Player {
     this.visionBuffUntil = 0;
 
     this.invulnerableUntil = 0;
+
+    // --- Amunisi: infinite, tapi tiap 50 peluru harus reload 3 detik ---
+    this.ammo = MAG_SIZE;
+    this.reloadUntil = 0; // elapsedTime sampai kapan sedang reload
+
+    // --- State animasi ---
+    this.facingDir = -1;     // -1 = hadap kiri (West, default sprite), +1 = kanan
+    this.moving = false;
+    this.clipTime = 0;       // waktu berjalan di klip animasi aktif
+    this.firingUntil = 0;    // tampilkan animasi firing sampai elapsedTime ini
+    this.dead = false;
+    this.deathTime = 0;      // waktu berjalan sejak mulai animasi death
   }
 
   get damage() {
     // Naik level (xp) menambah damage, sesuai "XP (tambah damage)" di Game UI.
     return this.baseDamage + (this.powerLevel || 0) * 2;
+  }
+
+  isReloading(elapsedTime) {
+    return elapsedTime < this.reloadUntil;
+  }
+
+  // Dipanggil game.js tiap kali player berhasil menembak 1 peluru.
+  notifyShot(elapsedTime) {
+    this.ammo -= 1;
+    this.firingUntil = elapsedTime + 0.35; // durasi tampil animasi firing
+    if (this.ammo <= 0) {
+      this.ammo = MAG_SIZE;
+      this.reloadUntil = elapsedTime + RELOAD_TIME;
+    }
   }
 
   isInvulnerable(elapsedTime) {
@@ -34,14 +63,30 @@ export class Player {
     this.invulnerableUntil = elapsedTime + invulnSeconds;
   }
 
+  startDeath() {
+    if (!this.dead) {
+      this.dead = true;
+      this.deathTime = 0;
+    }
+  }
+
   update(dt, input, elapsedTime) {
+    if (this.dead) {
+      this.deathTime += dt;
+      return;
+    }
+
     let dx = input.x;
     let dy = input.y;
     const len = Math.hypot(dx, dy);
-    if (len > 0.001) {
+    this.moving = len > 0.001;
+    if (this.moving) {
       dx /= len;
       dy /= len;
       this.facing = { x: dx, y: dy };
+      // Update arah hadap horizontal hanya kalau ada komponen kiri/kanan.
+      // Gerak vertikal murni mempertahankan arah hadap terakhir.
+      if (Math.abs(dx) > 0.01) this.facingDir = dx < 0 ? -1 : 1;
     } else {
       dx = 0;
       dy = 0;
@@ -67,6 +112,8 @@ export class Player {
     this.y = clamp(nextY, this.r, WORLD_H - this.r);
 
     if (this.fireCooldown > 0) this.fireCooldown -= dt;
+
+    this.clipTime += dt;
   }
 
   currentVisionRadius(elapsedTime, baseRadius) {
@@ -79,16 +126,44 @@ export class Player {
     return this.baseRange;
   }
 
-  draw(ctx, elapsedTime) {
-    const blinking = this.isInvulnerable(elapsedTime) && Math.floor(elapsedTime * 12) % 2 === 0;
-    if (blinking) ctx.globalAlpha = 0.4;
+  // Pilih klip animasi aktif berdasarkan state. Mengembalikan nama sprite key.
+  _activeClip(elapsedTime) {
+    if (this.dead) return 'playerDeath';
+    if (elapsedTime < this.firingUntil) return 'playerFiring';
+    if (this.moving) return 'playerRun';
+    return 'playerIdle';
+  }
 
-    if (drawSprite(ctx, 'player', this.x, this.y, this.r * 2.6)) {
+  draw(ctx, elapsedTime) {
+    const mirror = this.facingDir > 0; // sprite sumber hadap kiri; kanan = mirror
+    const size = this.r * 4.2;         // render sedikit lebih besar dari radius fisik
+
+    // --- Path sprite ---
+    const clip = this._activeClip(elapsedTime);
+    if (spriteReady(clip)) {
+      let frame;
+      if (clip === 'playerRun') {
+        // ping-pong biar loop lari mulus (maju lalu balik), tidak patah.
+        frame = frameForClip(clip, this.clipTime, 12, 'pingpong').index;
+      } else if (clip === 'playerFiring') {
+        frame = frameForClip(clip, elapsedTime, 20, 'loop').index;
+      } else if (clip === 'playerDeath') {
+        frame = frameForClip(clip, this.deathTime, 10, 'once').index;
+      } else {
+        frame = 0; // idle
+      }
+
+      const blinking = this.isInvulnerable(elapsedTime) && Math.floor(elapsedTime * 12) % 2 === 0;
+      if (blinking) ctx.globalAlpha = 0.4;
+      drawSprite(ctx, clip, this.x, this.y, size, frame, mirror);
       ctx.globalAlpha = 1;
       return;
     }
 
-    // Fallback primitif (dipakai selama sprite belum ada di assets/images/).
+    // --- Fallback primitif (kalau sprite belum ada) ---
+    const blinking = this.isInvulnerable(elapsedTime) && Math.floor(elapsedTime * 12) % 2 === 0;
+    if (blinking) ctx.globalAlpha = 0.4;
+
     ctx.fillStyle = '#FF6F59';
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);

@@ -15,31 +15,52 @@
 html, body {
   margin: 0;
   padding: 0;
+  width: 100%;
   height: 100%;
-  background: var(--bg-deep);
+  background: #05070f;
   color: var(--text-light);
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   overflow: hidden;
+  /* Cegah gesture default browser (scroll, pull-to-refresh, seleksi, highlight tap) */
   touch-action: none;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
 }
 
 #game-container {
-  position: relative;
-  width: 390px;
-  max-width: 100vw;
-  margin: 0 auto;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  padding-top: env(safe-area-inset-top, 8px);
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Canvas mengisi seluruh layar; skala/letterbox dunia diatur di dalam canvas
+   (viewport.js), bukan lewat CSS. */
+#game-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
 }
 
 #hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
   width: 100%;
-  padding: 8px 12px;
+  padding: 10px 14px 12px;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 10px);
   z-index: 5;
+  pointer-events: none; /* HUD tidak menghalangi input ke canvas */
+  /* Gradient gelap agar teks HUD tetap terbaca di atas background terang. */
+  background: linear-gradient(to bottom, rgba(11,15,43,0.75), rgba(11,15,43,0));
+  text-shadow: 0 1px 2px rgba(0,0,0,0.6);
 }
 
 #hud-top {
@@ -88,15 +109,6 @@ html, body {
   width: 0%;
   background: var(--accent-teal);
   transition: width 0.15s ease-out;
-}
-
-#game-canvas {
-  background: #16281C;
-  border-radius: 12px;
-  box-shadow: 0 0 0 1px rgba(255,255,255,0.06);
-  touch-action: none;
-  max-width: 100%;
-  height: auto;
 }
 
 #overlay {
@@ -149,8 +161,11 @@ html, body {
 
 #touch-controls {
   position: absolute;
-  left: 24px;
-  bottom: 24px;
+  /* Tengah-bawah layar — lebih gampang dijangkau ibu jari di HP daripada
+     pojok kiri-bawah. */
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
   z-index: 6;
 }
 
