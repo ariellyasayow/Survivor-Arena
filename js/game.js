@@ -37,9 +37,10 @@ export const CONFIG = {
   MAX_LIVES: 5,
   START_LIVES: 3,
   XP_TO_LEVEL_BASE: 40,
-  NIGHT_VISION_RADIUS: 130,
+  NIGHT_VISION_RADIUS: 140,
 };
 
+// --- DIKEMBALIKAN KE TOP LEVEL AGAR TOMBOL MULAI SELALU BERFUNGSI ---
 const overlayEl = document.getElementById('overlay');
 const overlayTitleEl = document.getElementById('overlay-title');
 const overlayMessageEl = document.getElementById('overlay-message');
@@ -51,12 +52,26 @@ export class Game {
     this.ctx = canvas.getContext('2d');
     this.reset();
 
-    overlayButtonEl.addEventListener('click', () => {
-      if (this.state === 'ended') {
-        this.reset();
+    if (overlayButtonEl) {
+      overlayButtonEl.onclick = () => {
+        if (this.state === 'ended') {
+          this.reset();
+        }
+        this.state = 'playing';
+        if (overlayEl) overlayEl.classList.add('hidden');
+      };
+    }
+
+    // Event Delegation sebagai pengaman ganda tombol Mulai
+    document.addEventListener('click', (e) => {
+      if (e.target && (e.target.id === 'overlay-button' || e.target.closest('#overlay-button'))) {
+        if (this.state === 'intro' || this.state === 'ended') {
+          if (this.state === 'ended') this.reset();
+          this.state = 'playing';
+          const el = document.getElementById('overlay');
+          if (el) el.classList.add('hidden');
+        }
       }
-      this.state = 'playing';
-      overlayEl.classList.add('hidden');
     });
   }
 
@@ -94,10 +109,12 @@ export class Game {
 
     clearVFX();
 
-    overlayTitleEl.textContent = 'Survivor Arena';
-    overlayMessageEl.textContent = 'Kumpulkan poin, hindari & hajar musuh, bertahan sampai waktu habis.\nLevel terakhir akan gelap.';
-    overlayButtonEl.textContent = 'Mulai';
-    overlayEl.classList.remove('hidden');
+    if (overlayTitleEl) {
+      overlayTitleEl.textContent = 'Survivor Arena';
+      overlayMessageEl.textContent = 'Kumpulkan poin, hindari & hajar musuh, bertahan sampai waktu habis.\nLevel terakhir akan gelap.';
+      overlayButtonEl.textContent = 'Mulai';
+      if (overlayEl) overlayEl.classList.remove('hidden');
+    }
   }
 
   get isNight() {
@@ -139,11 +156,18 @@ export class Game {
     this.points.push(new PointItem(x, y, 1));
   }
 
+  // --- POWER UP RANGE HANYA MUNCUL DI LEVEL 3 (MALAM) ---
   spawnPowerUp() {
     const margin = 24;
     const x = randRange(margin, WORLD_W - margin);
     const y = randRange(margin, WORLD_H - margin);
-    const type = POWERUP_TYPES[randInt(0, POWERUP_TYPES.length - 1)];
+    
+    const availableTypes = POWERUP_TYPES.filter(type => {
+      if (type === 'range' && !this.isNight) return false;
+      return true;
+    });
+
+    const type = availableTypes[randInt(0, availableTypes.length - 1)];
     this.powerUps.push(new PowerUpItem(x, y, type));
   }
 
@@ -315,7 +339,14 @@ export class Game {
       if (!pu.collected && circleCollide(this.player, pu)) {
         pu.collected = true;
         applyPowerUp(pu.type, this.player, this);
-        spawnFloatingText(pu.x, pu.y, 'Power up!', '#EAF2FF');
+        
+        let text = 'Power Up!';
+        if (pu.type === 'life') text = '+1 Nyawa!';
+        if (pu.type === 'damage') text = 'Peluru Sakit!';
+        if (pu.type === 'speed') text = 'Lari Cepat!';
+        if (pu.type === 'range') text = 'Cahaya Terang!';
+        
+        spawnFloatingText(pu.x, pu.y - 20, text, '#FFC857');
         sfxPowerUp();
       }
     }
@@ -323,21 +354,29 @@ export class Game {
 
     const alive = (arr) => arr.filter((e) => !e.dying).length;
 
+    // --- SPAWN MUSUH BERTAHAP ---
     this.enemySpawnTimer -= dt;
     if (this.enemySpawnTimer <= 0) {
       if (alive(this.enemies) < CONFIG.MAX_ENEMY1) this.spawnEnemy();
       this.enemySpawnTimer = CONFIG.ENEMY_SPAWN_INTERVAL;
     }
-    this.enemy2SpawnTimer -= dt;
-    if (this.enemy2SpawnTimer <= 0) {
-      if (alive(this.enemy2s) < CONFIG.MAX_ENEMY2) this.spawnEnemy2();
-      this.enemy2SpawnTimer = CONFIG.ENEMY_SPAWN_INTERVAL * 2.5;
+
+    if (this.stageIndex >= 1) {
+      this.enemy3SpawnTimer -= dt;
+      if (this.enemy3SpawnTimer <= 0) {
+        if (alive(this.enemy3s) < CONFIG.MAX_ENEMY3) this.spawnEnemy3();
+        this.enemy3SpawnTimer = CONFIG.ENEMY_SPAWN_INTERVAL * 2.8;
+      }
     }
-    this.enemy3SpawnTimer -= dt;
-    if (this.enemy3SpawnTimer <= 0) {
-      if (alive(this.enemy3s) < CONFIG.MAX_ENEMY3) this.spawnEnemy3();
-      this.enemy3SpawnTimer = CONFIG.ENEMY_SPAWN_INTERVAL * 3.0;
+
+    if (this.stageIndex >= 2) {
+      this.enemy2SpawnTimer -= dt;
+      if (this.enemy2SpawnTimer <= 0) {
+        if (alive(this.enemy2s) < CONFIG.MAX_ENEMY2) this.spawnEnemy2();
+        this.enemy2SpawnTimer = CONFIG.ENEMY_SPAWN_INTERVAL * 3.5;
+      }
     }
+
     this.pointSpawnTimer -= dt;
     if (this.pointSpawnTimer <= 0) {
       this.spawnPoint();
@@ -383,8 +422,9 @@ export class Game {
       this.powerLevel += 1;
       this.player.powerLevel = this.powerLevel;
       this.xpToNextLevel = Math.round(this.xpToNextLevel * 1.25);
-      this.lives = Math.min(this.maxLives, this.lives + 1);
+      
       spawnLevelUpBurst(this.player.x, this.player.y);
+      spawnFloatingText(this.player.x, this.player.y - 30, 'LEVEL UP! Damage+', '#2DE1C7');
       sfxLevelUp();
     }
   }
@@ -433,12 +473,15 @@ export class Game {
   endGame(won) {
     this.state = 'ended';
     sfxGameOver();
-    overlayTitleEl.textContent = won ? 'Kamu selamat!' : 'Game over';
-    overlayMessageEl.textContent = won
-      ? `Semua level selesai. Skor akhir: ${this.score}`
-      : `Kehabisan nyawa di level ${this.stageIndex + 1}. Skor akhir: ${this.score}`;
-    overlayButtonEl.textContent = 'Main lagi';
-    overlayEl.classList.remove('hidden');
+    
+    if (overlayTitleEl) {
+      overlayTitleEl.textContent = won ? 'Kamu selamat!' : 'Game over';
+      overlayMessageEl.textContent = won
+        ? `Semua level selesai. Skor akhir: ${this.score}`
+        : `Kehabisan nyawa di level ${this.stageIndex + 1}. Skor akhir: ${this.score}`;
+      overlayButtonEl.textContent = 'Main lagi';
+      if (overlayEl) overlayEl.classList.remove('hidden');
+    }
   }
 
   render() {
@@ -457,7 +500,6 @@ export class Game {
     ctx.rect(0, 0, VIEWPORT_W, VIEWPORT_H);
     ctx.clip();
 
-    // Geser kanvas berlawanan arah dengan posisi kamera
     ctx.translate(-camera.x, -camera.y);
 
     drawBackground(ctx, this.isNight);
@@ -478,36 +520,39 @@ export class Game {
 
     ctx.restore();
 
-    // Gambar Mini-Map di atas layer game logis (tanpa offset kamera)
     if (this.state === 'playing' || this.state === 'dying') {
       this.drawMiniMap(ctx);
     }
   }
 
+  // --- REVISI LAMPU MALAM: MENGGUNAKAN TRIK EVENODD AGAR TIDAK MENGHAPUS GAMBAR ---
   drawNightMask(ctx) {
     const radius = this.player.currentVisionRadius(this.elapsedTime, CONFIG.NIGHT_VISION_RADIUS);
-    ctx.fillStyle = 'rgba(0,0,0,0.86)';
-    ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+    
+    ctx.save();
+    // 1. Gambar kegelapan malam DI LUAR lingkaran pandangan (menggunakan aturan evenodd)
+    ctx.fillStyle = 'rgba(5, 7, 15, 0.94)';
+    ctx.beginPath();
+    // Kotak menutupi seluruh area dunia game
+    ctx.rect(0, 0, WORLD_W, WORLD_H);
+    // Lubang lingkaran berlawanan arah jarum jam tepat di posisi player
+    ctx.arc(this.player.x, this.player.y, radius, 0, Math.PI * 2, true);
+    ctx.fill('evenodd');
 
-    ctx.globalCompositeOperation = 'destination-out';
-    if (isLowQuality()) {
-      ctx.fillStyle = 'rgba(0,0,0,1)';
-      ctx.beginPath();
-      ctx.arc(this.player.x, this.player.y, radius * 0.85, 0, Math.PI * 2);
-      ctx.fill();
-    } else {
+    // 2. Efek transisi halus (soft glow) di pinggiran senter agar tidak kaku
+    if (!isLowQuality()) {
       const gradient = ctx.createRadialGradient(
-        this.player.x, this.player.y, radius * 0.3,
-        this.player.x, this.player.y, radius,
+        this.player.x, this.player.y, radius * 0.5,
+        this.player.x, this.player.y, radius
       );
-      gradient.addColorStop(0, 'rgba(0,0,0,1)');
-      gradient.addColorStop(1, 'rgba(0,0,0,0)');
+      gradient.addColorStop(0, 'rgba(5, 7, 15, 0)');
+      gradient.addColorStop(1, 'rgba(5, 7, 15, 0.94)');
       ctx.fillStyle = gradient;
       ctx.beginPath();
       ctx.arc(this.player.x, this.player.y, radius, 0, Math.PI * 2);
       ctx.fill();
     }
-    ctx.globalCompositeOperation = 'source-over';
+    ctx.restore();
   }
 
   drawMiniMap(ctx) {
@@ -518,7 +563,6 @@ export class Game {
     const mapY = margin;
 
     ctx.save();
-    // Background minimap
     ctx.fillStyle = 'rgba(11, 15, 43, 0.85)';
     ctx.fillRect(mapX, mapY, mapW, mapH);
     ctx.strokeStyle = '#2DE1C7';
@@ -528,14 +572,12 @@ export class Game {
     const scaleX = mapW / WORLD_W;
     const scaleY = mapH / WORLD_H;
 
-    // Titik Musuh (Merah)
     ctx.fillStyle = '#FF5470';
     for (const e of this.allEnemies()) {
       if (e.dying) continue;
       ctx.fillRect(mapX + e.x * scaleX - 1.5, mapY + e.y * scaleY - 1.5, 3, 3);
     }
 
-    // Area Kamera / Viewport (Garis samar)
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
     ctx.lineWidth = 1;
     ctx.strokeRect(
@@ -545,7 +587,6 @@ export class Game {
       VIEWPORT_H * scaleY
     );
 
-    // Titik Player (Kuning/Emas)
     ctx.fillStyle = '#FFC857';
     ctx.beginPath();
     ctx.arc(mapX + this.player.x * scaleX, mapY + this.player.y * scaleY, 3, 0, Math.PI * 2);

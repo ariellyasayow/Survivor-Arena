@@ -1,40 +1,33 @@
-// Definisi & penerapan efek untuk tiap jenis power-up.
-// Sesuai dokumen konsep "Power Up Effects":
-// 1. Jangkauan peluru lebih besar
-// 2. Penambahan timer
-// 3. Menambah jangkauan cahaya (khusus malam)
-// 4. Menambah nyawa player
-
-export const POWERUP_TYPES = ['range', 'timer', 'vision', 'life'];
+export const POWERUP_TYPES = ['life', 'damage', 'speed', 'range'];
 
 export const POWERUP_META = {
-  range: { color: '#2DE1C7', label: 'Jangkauan+' },
-  timer: { color: '#FFC857', label: '+Waktu' },
-  vision: { color: '#9FC1E8', label: 'Cahaya+' },
   life: { color: '#FF5470', label: '+Nyawa' },
+  damage: { color: '#FF6F59', label: 'Damage+' },
+  speed: { color: '#FFC857', label: 'Cepat!' },
+  range: { color: '#2DE1C7', label: 'Cahaya Terang!' },
 };
-
-const RANGE_BUFF_DURATION = 8; // detik
-const VISION_BUFF_DURATION = 10; // detik
-const TIMER_BONUS_SECONDS = 8;
 
 export function applyPowerUp(type, player, game) {
   switch (type) {
-    case 'range':
-      player.rangeBuffUntil = game.elapsedTime + RANGE_BUFF_DURATION;
-      break;
-    case 'timer':
-      game.timeLeft += TIMER_BONUS_SECONDS;
-      break;
-    case 'vision':
-      // Hanya relevan kalau sedang malam (stage terakhir), tapi aman
-      // dipakai kapan saja karena cuma menambah radius penglihatan.
-      player.visionBuffUntil = game.elapsedTime + VISION_BUFF_DURATION;
-      break;
     case 'life':
+      // Menambah hati (nyawa) dengan maksimal sesuai maxLives
       game.lives = Math.min(game.maxLives, game.lives + 1);
       break;
-    default:
+    case 'damage':
+      // Peluru sakit sementara waktu (+5 damage selama 8 detik)
+      player.baseDamage += 5;
+      setTimeout(() => { player.baseDamage -= 5; }, 8000);
+      break;
+    case 'speed':
+      // Kecepatan lari bertambah drastis sementara (+40 speed selama 6 detik)
+      player.baseSpeed += 40;
+      setTimeout(() => { player.baseSpeed -= 40; }, 6000);
+      break;
+    case 'range':
+      // Memperlebar jangkauan tembakan peluru selama 12 detik
+      player.rangeBuffUntil = game.elapsedTime + 12;
+      // Memperbesar lingkaran senter cahaya di malam hari (Level 3) selama 12 detik!
+      player.visionBuffUntil = game.elapsedTime + 12;
       break;
   }
 }
