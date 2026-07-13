@@ -1,3 +1,5 @@
+import { drawSprite } from '../utils/assets.js';
+
 export class Projectile {
   constructor(x, y, dirX, dirY, range, damage) {
     this.x = x;
@@ -20,6 +22,9 @@ export class Projectile {
   }
 
   draw(ctx) {
+    if (drawSprite(ctx, 'projectile', this.x, this.y, this.r * 2.4)) return;
+
+    // Fallback primitif (dipakai selama sprite belum ada di assets/images/).
     ctx.fillStyle = '#FFC857';
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);

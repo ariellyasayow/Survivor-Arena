@@ -1,6 +1,12 @@
 // Environment: ground bertekstur + obstacle pohon/batu.
 // Di-render ke offscreen canvas sekali per mode (siang/malam) lalu di-cache,
 // supaya tiap frame tinggal drawImage (murah), bukan redraw semua tiap frame.
+//
+// Kalau assets/images/bg-tile.webp tersedia, ground di-tile pakai gambar itu
+// (di-repeat, jadi satu file kecil cukup buat seluruh dunia). Kalau belum,
+// tetap pakai grassBase + patch warna solid seperti sekarang.
+
+import { getSprite } from '../utils/assets.js';
 
 export const WORLD_W = 390;
 export const WORLD_H = 640;
@@ -92,8 +98,19 @@ function buildCache(isNight) {
   off.height = WORLD_H;
   const ctx = off.getContext('2d');
 
-  ctx.fillStyle = p.grassBase;
-  ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+  const bgTile = getSprite('bgTile');
+  if (bgTile && bgTile.ready) {
+    const pattern = ctx.createPattern(bgTile.img, 'repeat');
+    ctx.fillStyle = pattern;
+    ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+    if (isNight) {
+      ctx.fillStyle = 'rgba(5,10,8,0.55)';
+      ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+    }
+  } else {
+    ctx.fillStyle = p.grassBase;
+    ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+  }
 
   ctx.globalAlpha = 0.5;
   const patches = [

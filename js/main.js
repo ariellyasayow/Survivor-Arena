@@ -1,8 +1,14 @@
 import { Game } from './game.js';
 import { unlockAudio } from './effects/sfx.js';
+import { preloadSprites } from './utils/assets.js';
 
 const canvas = document.getElementById('game-canvas');
 const game = new Game(canvas);
+
+// Preload sprite (kalau ada) sebelum game loop jalan, supaya tidak ada
+// gambar "pop-in" di tengah gameplay. Aman walau belum ada file gambar
+// sama sekali — entity fallback ke bentuk primitif Canvas.
+await preloadSprites();
 
 // ---- Input keyboard (buat testing di desktop) ------------------------------
 const keys = { up: false, down: false, left: false, right: false };

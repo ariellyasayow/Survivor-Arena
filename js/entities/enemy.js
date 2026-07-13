@@ -1,3 +1,5 @@
+import { drawSprite } from '../utils/assets.js';
+
 let enemyIdCounter = 0;
 
 export class Enemy {
@@ -49,16 +51,29 @@ export class Enemy {
   draw(ctx, elapsedTime) {
     const flashing = elapsedTime < this.hitFlashUntil;
 
-    ctx.fillStyle = flashing ? '#FFFFFF' : '#7B3FE4';
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
-    ctx.fill();
+    if (drawSprite(ctx, 'enemy', this.x, this.y, this.r * 2.6)) {
+      if (flashing) {
+        ctx.save();
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    } else {
+      // Fallback primitif (dipakai selama sprite belum ada di assets/images/).
+      ctx.fillStyle = flashing ? '#FFFFFF' : '#7B3FE4';
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+      ctx.fill();
 
-    ctx.fillStyle = '#EAF2FF';
-    ctx.beginPath();
-    ctx.arc(this.x - 3, this.y - 2, 2, 0, Math.PI * 2);
-    ctx.arc(this.x + 3, this.y - 2, 2, 0, Math.PI * 2);
-    ctx.fill();
+      ctx.fillStyle = '#EAF2FF';
+      ctx.beginPath();
+      ctx.arc(this.x - 3, this.y - 2, 2, 0, Math.PI * 2);
+      ctx.arc(this.x + 3, this.y - 2, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     // Mini health bar di atas kepala
     const w = this.r * 1.8;

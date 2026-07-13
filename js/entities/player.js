@@ -1,5 +1,6 @@
 import { clamp } from '../utils/helpers.js';
 import { WORLD_W, WORLD_H, OBSTACLES } from '../world/background.js';
+import { drawSprite } from '../utils/assets.js';
 
 export class Player {
   constructor() {
@@ -82,6 +83,12 @@ export class Player {
     const blinking = this.isInvulnerable(elapsedTime) && Math.floor(elapsedTime * 12) % 2 === 0;
     if (blinking) ctx.globalAlpha = 0.4;
 
+    if (drawSprite(ctx, 'player', this.x, this.y, this.r * 2.6)) {
+      ctx.globalAlpha = 1;
+      return;
+    }
+
+    // Fallback primitif (dipakai selama sprite belum ada di assets/images/).
     ctx.fillStyle = '#FF6F59';
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
