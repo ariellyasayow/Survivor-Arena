@@ -15,21 +15,20 @@ import { sfxShoot, sfxHit, sfxPoint, sfxLevelUp, sfxPowerUp, sfxMonster, sfxGame
 import { POWERUP_TYPES, applyPowerUp } from './effects/powerup-effects.js';
 import { circleCollide, distance, randRange, randInt, randomEdgePoint } from './utils/helpers.js';
 import { spriteReady } from './utils/assets.js';
-import { viewport } from './viewport.js';
+import { viewport, camera, updateCamera } from './viewport.js';
+import { VIEWPORT_W, VIEWPORT_H } from './config.js';
 import { isLowQuality } from './quality.js';
 
-// ---- Konfigurasi (gampang di-tuning di sini) -------------------------------
 export const CONFIG = {
   STAGE_COUNT: 3,
-  STAGE_TARGET: [15, 22, 30],       // target poin per stage
-  STAGE_TIME: [45, 40, 40],         // detik per stage
+  STAGE_TARGET: [15, 22, 30],
+  STAGE_TIME: [45, 40, 40],
   BASE_ENEMY_HP: 18,
   BASE_ENEMY_DAMAGE: 1,
   ENEMY_HP_GROWTH_PER_STAGE: 1.3,
   ENEMY_DMG_GROWTH_PER_STAGE: 1,
   ENEMY_SPEED: 55,
-  ENEMY_SPAWN_INTERVAL: 1.8,        // detik antar spawn enemy
-  // Batas jumlah enemy aktif per tipe (cegah layar terlalu ramai).
+  ENEMY_SPAWN_INTERVAL: 1.8,
   MAX_ENEMY1: 8,
   MAX_ENEMY2: 3,
   MAX_ENEMY3: 3,
@@ -62,7 +61,7 @@ export class Game {
   }
 
   reset() {
-    this.state = 'intro'; // intro | playing | ended
+    this.state = 'intro';
     this.elapsedTime = 0;
     this.stageIndex = 0;
     this.stageCount = CONFIG.STAGE_COUNT;
@@ -83,13 +82,13 @@ export class Game {
     this.enemies = [];
     this.enemy2s = [];
     this.enemy3s = [];
-    clearProjectiles(); // projectiles sekarang dikelola pool (lihat projectilePool.js)
+    clearProjectiles();
     this.points = [];
     this.powerUps = [];
 
     this.enemySpawnTimer = 0;
-    this.enemy2SpawnTimer = 3.5; // delay spawn enemy2 saat stage mulai
-    this.enemy3SpawnTimer = 5.0; // delay spawn enemy3 lebih lambat
+    this.enemy2SpawnTimer = 3.5;
+    this.enemy3SpawnTimer = 5.0;
     this.pointSpawnTimer = 0.5;
     this.powerUpSpawnTimer = CONFIG.POWERUP_SPAWN_INTERVAL;
 
@@ -105,7 +104,6 @@ export class Game {
     return this.stageIndex === this.stageCount - 1;
   }
 
-  // -------------------------------------------------------------- spawning --
   spawnEnemy() {
     const p = randomEdgePoint(WORLD_W, WORLD_H, 16);
     const hp = CONFIG.BASE_ENEMY_HP * Math.pow(CONFIG.ENEMY_HP_GROWTH_PER_STAGE, this.stageIndex);
@@ -116,10 +114,9 @@ export class Game {
   }
 
   spawnEnemy2() {
-    // Enemy2: HP 25% lebih rendah, speed 2x (di-handle di Enemy2 class)
     const p = randomEdgePoint(WORLD_W, WORLD_H, 16);
     const baseHp = CONFIG.BASE_ENEMY_HP * Math.pow(CONFIG.ENEMY_HP_GROWTH_PER_STAGE, this.stageIndex);
-    const hp = baseHp * 0.75; // 25% lebih rendah
+    const hp = baseHp * 0.75;
     const dmg = CONFIG.BASE_ENEMY_DAMAGE + CONFIG.ENEMY_DMG_GROWTH_PER_STAGE * this.stageIndex;
     const speed = CONFIG.ENEMY_SPEED + this.stageIndex * 8;
     this.enemy2s.push(new Enemy2(p.x, p.y, hp, dmg, speed));
@@ -127,7 +124,6 @@ export class Game {
   }
 
   spawnEnemy3() {
-    // Enemy3: HP sama dengan enemy1, serangan jarak jauh
     const p = randomEdgePoint(WORLD_W, WORLD_H, 16);
     const hp = CONFIG.BASE_ENEMY_HP * Math.pow(CONFIG.ENEMY_HP_GROWTH_PER_STAGE, this.stageIndex);
     const dmg = CONFIG.BASE_ENEMY_DAMAGE + CONFIG.ENEMY_DMG_GROWTH_PER_STAGE * this.stageIndex;
@@ -151,17 +147,14 @@ export class Game {
     this.powerUps.push(new PowerUpItem(x, y, type));
   }
 
-  // Semua musuh dari semua tipe (untuk auto-aim & targeting).
   allEnemies() {
     return [...this.enemies, ...this.enemy2s, ...this.enemy3s];
   }
 
-  // ---------------------------------------------------------------- shoot --
   tryShoot() {
     if (this.player.fireCooldown > 0) return;
-    if (this.player.isReloading(this.elapsedTime)) return; // magazine habis, tunggu reload
+    if (this.player.isReloading(this.elapsedTime)) return;
 
-    // Cari musuh terdekat (semua tipe) yang bisa ditembak.
     let nearest = null;
     let nearestDist = Infinity;
     for (const e of this.allEnemies()) {
@@ -181,19 +174,17 @@ export class Game {
     const dy = (nearest.y - this.player.y) / nearestDist;
     spawnProjectile(this.player.x, this.player.y, dx, dy, range, this.player.damage);
     this.player.fireCooldown = this.player.baseFireRate;
-    this.player.notifyShot(this.elapsedTime); // kurangi amunisi & picu animasi firing/reload
+    this.player.notifyShot(this.elapsedTime);
     sfxShoot();
   }
 
-  // --------------------------------------------------------------- update --
   update(dt, input) {
-    // Selama animasi kematian player: bekukan gameplay, hanya lanjutkan
-    // animasi player + efek visual, lalu tampilkan overlay saat selesai.
     if (this.state === 'dying') {
       this.elapsedTime += dt;
       this.player.update(dt, { x: 0, y: 0 }, this.elapsedTime);
+      updateCamera(this.player.x, this.player.y);
       updateVFX(dt);
-      if (this.player.deathTime >= 0.9) { // 9 frame @ 10fps
+      if (this.player.deathTime >= 0.9) {
         this.endGame(false);
       }
       return;
@@ -205,60 +196,49 @@ export class Game {
     this.timeLeft -= dt;
 
     this.player.update(dt, input, this.elapsedTime);
+    updateCamera(this.player.x, this.player.y);
     this.tryShoot();
 
-    updateProjectiles(dt); // pool: update + swap-and-pop, tanpa alokasi array
+    updateProjectiles(dt);
 
     for (const e of this.enemies) {
       const wasAttacking = e.attacking;
       e.update(dt, this.player, this.elapsedTime, OBSTACLES);
-      // Suara sabetan sekali di awal serangan (antisipasi sebelum kena).
       if (!wasAttacking && e.attacking) {
         sfxSwing();
       }
     }
     for (const e2 of this.enemy2s) {
       e2.update(dt, this.player, this.elapsedTime, OBSTACLES);
-      // Ledakan sekali TEPAT saat mulai mati (one-shot flag di-consume di
-      // sini) — jalan untuk SEMUA penyebab kematian: windup selesai ATAU
-      // kena tembak (yang startDeath()-nya dipanggil di collision loop lain).
       if (e2.consumeExplosionTrigger()) {
         spawnHitParticles(e2.x, e2.y, '#FF6B4A', 14);
         sfxExplosion();
       }
-      // Radius ledakan aktif sepanjang animasi mati: cek tiap frame, hanya
-      // melukai sekali (di-handle di hitsPlayerNow).
       if (e2.hitsPlayerNow(this.player)) {
-        this.onPlayerHit(1, { instantKill: true }); // ledakan langsung mematikan
+        this.onPlayerHit(1, { instantKill: true });
       }
     }
     for (const e3 of this.enemy3s) {
       e3.update(dt, this.player, this.elapsedTime, OBSTACLES);
-      // Enemy3 melepas LASER lurus KE ARAH player saat momen tembak (arah
-      // dikunci sekali di sini; laser tidak mengejar/homing setelah lepas).
       if (e3.shouldFireLaser()) {
         const dx = this.player.x - e3.x;
         const dy = this.player.y - e3.y;
         const dist = Math.hypot(dx, dy) || 1;
         const dirX = dx / dist;
         const dirY = dy / dist;
-        // Spawn sedikit di depan enemy3 (searah tembak) supaya berkas tidak
-        // menutupi badan enemy3 & tidak terlihat "menembak diri sendiri".
         const muzzle = e3.r + 8;
         const sx = e3.x + dirX * muzzle;
         const sy = e3.y + dirY * muzzle;
         const laser = spawnProjectile(sx, sy, dirX, dirY, e3.attackRange, e3.damage, true);
-        laser.isLaser = true; // digambar sebagai berkas laser, bukan bulatan
+        laser.isLaser = true;
         sfxLaser();
       }
     }
 
-    // Tabrakan peluru vs enemy — HANYA peluru player yang melukai enemy.
-    // (Peluru/laser enemy tidak boleh mengenai enemy lain / dirinya sendiri.)
     forEachActiveProjectile((proj) => {
       if (proj.isEnemy) return;
       for (const e of this.enemies) {
-        if (e.dying) continue; // sudah kalah, sedang animasi mati
+        if (e.dying) continue;
         if (circleCollide(proj, e)) {
           e.takeDamage(proj.damage, this.elapsedTime);
           proj.dead = true;
@@ -271,7 +251,6 @@ export class Game {
           break;
         }
       }
-      // Tabrakan peluru vs enemy2
       for (const e2 of this.enemy2s) {
         if (e2.dying || e2.attacking) continue;
         if (circleCollide(proj, e2)) {
@@ -286,7 +265,6 @@ export class Game {
           break;
         }
       }
-      // Tabrakan peluru vs enemy3
       for (const e3 of this.enemy3s) {
         if (e3.dying) continue;
         if (circleCollide(proj, e3)) {
@@ -302,34 +280,29 @@ export class Game {
         }
       }
     });
-    // Hapus enemy hanya setelah animasi kematiannya selesai.
+
     this.enemies = this.enemies.filter((e) => !e.isGone());
     this.enemy2s = this.enemy2s.filter((e2) => !e2.isGone());
     this.enemy3s = this.enemy3s.filter((e3) => !e3.isGone());
 
-    // Enemy1 menyerang lewat animasi sabetan (sinkron), bukan collision instan.
     for (const e of this.enemies) {
       if (e.shouldDealDamage(this.player)) {
         this.onPlayerHit(1);
       }
     }
 
-    // Tabrakan enemy vs player (enemy yang sedang mati tidak melukai)
     if (!this.player.isInvulnerable(this.elapsedTime)) {
-      // Enemy3 projectile → player (guard: maksimal 1 hit per frame, walau
-      // beberapa laser tumpang tindih di frame yang sama).
       let alreadyHit = false;
       forEachActiveProjectile((proj) => {
         if (alreadyHit || !proj.isEnemy || proj.dead) return;
         if (circleCollide(this.player, proj)) {
           alreadyHit = true;
-          this.onPlayerHit(1); // peluru enemy: 1 nyawa
+          this.onPlayerHit(1);
           proj.dead = true;
         }
       });
     }
 
-    // Ambil poin
     for (const pt of this.points) {
       if (!pt.collected && circleCollide(this.player, pt)) {
         pt.collected = true;
@@ -338,7 +311,6 @@ export class Game {
     }
     this.points = this.points.filter((p) => !p.collected);
 
-    // Ambil power-up
     for (const pu of this.powerUps) {
       if (!pu.collected && circleCollide(this.player, pu)) {
         pu.collected = true;
@@ -349,8 +321,6 @@ export class Game {
     }
     this.powerUps = this.powerUps.filter((p) => !p.collected);
 
-    // Spawner (dengan cap jumlah aktif per tipe agar layar tidak terlalu ramai).
-    // Enemy yang sedang animasi mati tidak dihitung.
     const alive = (arr) => arr.filter((e) => !e.dying).length;
 
     this.enemySpawnTimer -= dt;
@@ -358,13 +328,11 @@ export class Game {
       if (alive(this.enemies) < CONFIG.MAX_ENEMY1) this.spawnEnemy();
       this.enemySpawnTimer = CONFIG.ENEMY_SPAWN_INTERVAL;
     }
-    // Enemy2 (fast kamikaze) — spawn lebih jarang.
     this.enemy2SpawnTimer -= dt;
     if (this.enemy2SpawnTimer <= 0) {
       if (alive(this.enemy2s) < CONFIG.MAX_ENEMY2) this.spawnEnemy2();
       this.enemy2SpawnTimer = CONFIG.ENEMY_SPAWN_INTERVAL * 2.5;
     }
-    // Enemy3 (ranged) — spawn paling jarang.
     this.enemy3SpawnTimer -= dt;
     if (this.enemy3SpawnTimer <= 0) {
       if (alive(this.enemy3s) < CONFIG.MAX_ENEMY3) this.spawnEnemy3();
@@ -383,11 +351,9 @@ export class Game {
 
     updateVFX(dt);
 
-    // Cek target stage tercapai
     if (this.stageScore >= this.stageTarget) {
       this.advanceStage();
     } else if (this.timeLeft <= 0) {
-      // Waktu habis sebelum target tercapai: kehilangan 1 nyawa, timer reset.
       this.timeLeft = CONFIG.STAGE_TIME[this.stageIndex];
       this.onPlayerHit(1, { fromTimeout: true });
     }
@@ -423,10 +389,7 @@ export class Game {
     }
   }
 
-  // damage = jumlah nyawa yang hilang (default 1). Enemy2 ledakan pakai
-  // instantKill=true untuk langsung menghabiskan semua nyawa.
   onPlayerHit(damage = 1, { fromTimeout = false, instantKill = false } = {}) {
-    // Timeout (waktu habis) selalu menghukum; hit lain diabaikan saat kebal.
     if (!fromTimeout && this.player.isInvulnerable(this.elapsedTime)) return;
     this.lives -= instantKill ? this.lives : damage;
     if (this.lives < 0) this.lives = 0;
@@ -438,9 +401,6 @@ export class Game {
     }
   }
 
-  // Mulai animasi kematian player; overlay game over muncul setelah animasi
-  // selesai (lihat state 'dying' di update()). Kalau sprite death tidak ada,
-  // langsung game over.
   startPlayerDeath() {
     this.player.startDeath();
     sfxGameOver();
@@ -464,8 +424,8 @@ export class Game {
     this.enemy2s = [];
     this.enemy3s = [];
     clearProjectiles();
-    this.enemy2SpawnTimer = 3.5; // delay spawn enemy2 di stage baru
-    this.enemy3SpawnTimer = 5.0; // delay spawn enemy3
+    this.enemy2SpawnTimer = 3.5;
+    this.enemy3SpawnTimer = 5.0;
     spawnLevelUpBurst(this.player.x, this.player.y, '#2DE1C7');
     sfxLevelUp();
   }
@@ -481,25 +441,24 @@ export class Game {
     overlayEl.classList.remove('hidden');
   }
 
-  // ---------------------------------------------------------------- render --
   render() {
     const ctx = this.ctx;
     const { scale, offsetX, offsetY } = viewport;
 
-    // Bersihkan seluruh buffer canvas fisik & isi area letterbox dengan gelap.
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     ctx.fillStyle = '#05070f';
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-    // Transform ke koordinat dunia logis (0..WORLD_W, 0..WORLD_H), terpusat.
     ctx.setTransform(scale, 0, 0, scale, offsetX, offsetY);
 
-    // Clip ke area dunia supaya VFX/night-mask tidak bocor ke bar letterbox.
     ctx.save();
     ctx.beginPath();
-    ctx.rect(0, 0, WORLD_W, WORLD_H);
+    ctx.rect(0, 0, VIEWPORT_W, VIEWPORT_H);
     ctx.clip();
+
+    // Geser kanvas berlawanan arah dengan posisi kamera
+    ctx.translate(-camera.x, -camera.y);
 
     drawBackground(ctx, this.isNight);
 
@@ -518,6 +477,11 @@ export class Game {
     }
 
     ctx.restore();
+
+    // Gambar Mini-Map di atas layer game logis (tanpa offset kamera)
+    if (this.state === 'playing' || this.state === 'dying') {
+      this.drawMiniMap(ctx);
+    }
   }
 
   drawNightMask(ctx) {
@@ -527,7 +491,6 @@ export class Game {
 
     ctx.globalCompositeOperation = 'destination-out';
     if (isLowQuality()) {
-      // Quality rendah: lubang penglihatan solid (tanpa gradient halus) — murah.
       ctx.fillStyle = 'rgba(0,0,0,1)';
       ctx.beginPath();
       ctx.arc(this.player.x, this.player.y, radius * 0.85, 0, Math.PI * 2);
@@ -545,5 +508,49 @@ export class Game {
       ctx.fill();
     }
     ctx.globalCompositeOperation = 'source-over';
+  }
+
+  drawMiniMap(ctx) {
+    const mapW = 90;
+    const mapH = 90;
+    const margin = 12;
+    const mapX = VIEWPORT_W - mapW - margin;
+    const mapY = margin;
+
+    ctx.save();
+    // Background minimap
+    ctx.fillStyle = 'rgba(11, 15, 43, 0.85)';
+    ctx.fillRect(mapX, mapY, mapW, mapH);
+    ctx.strokeStyle = '#2DE1C7';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(mapX, mapY, mapW, mapH);
+
+    const scaleX = mapW / WORLD_W;
+    const scaleY = mapH / WORLD_H;
+
+    // Titik Musuh (Merah)
+    ctx.fillStyle = '#FF5470';
+    for (const e of this.allEnemies()) {
+      if (e.dying) continue;
+      ctx.fillRect(mapX + e.x * scaleX - 1.5, mapY + e.y * scaleY - 1.5, 3, 3);
+    }
+
+    // Area Kamera / Viewport (Garis samar)
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(
+      mapX + camera.x * scaleX,
+      mapY + camera.y * scaleY,
+      VIEWPORT_W * scaleX,
+      VIEWPORT_H * scaleY
+    );
+
+    // Titik Player (Kuning/Emas)
+    ctx.fillStyle = '#FFC857';
+    ctx.beginPath();
+    ctx.arc(mapX + this.player.x * scaleX, mapY + this.player.y * scaleY, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
   }
 }

@@ -1,28 +1,31 @@
 // Environment: ground bertekstur + obstacle pohon/batu.
-// Di-render ke offscreen canvas sekali per mode (siang/malam) lalu di-cache,
-// supaya tiap frame tinggal drawImage (murah), bukan redraw semua tiap frame.
-//
-// Kalau assets/spritesheets/ground/tile.webp tersedia, ground di-tile pakai
-// gambar itu (di-repeat, jadi satu file kecil cukup buat seluruh dunia).
-// Kalau belum, tetap pakai grassBase + patch warna solid seperti sekarang.
-
 import { spriteReady, drawSprite, frameForClip } from '../utils/assets.js';
 
-export const WORLD_W = 390;
-export const WORLD_H = 640;
+export const WORLD_W = 1200;
+export const WORLD_H = 1200;
 
-// Posisi obstacle tetap (dipakai untuk gambar DAN untuk collision).
+// Posisi obstacle disebar di area dunia 1200x1200
 export const OBSTACLES = [
-  { x: 55, y: 80, r: 20, type: 'tree' },
-  { x: 320, y: 55, r: 18, type: 'rock' },
-  { x: 340, y: 190, r: 22, type: 'tree' },
-  { x: 45, y: 230, r: 16, type: 'rock' },
-  { x: 95, y: 430, r: 20, type: 'tree' },
-  { x: 330, y: 440, r: 18, type: 'rock' },
-  { x: 200, y: 540, r: 22, type: 'tree' },
-  { x: 55, y: 575, r: 16, type: 'rock' },
-  { x: 345, y: 580, r: 20, type: 'tree' },
-  { x: 200, y: 150, r: 15, type: 'rock' },
+  { x: 120, y: 150, r: 24, type: 'tree' },
+  { x: 350, y: 100, r: 20, type: 'rock' },
+  { x: 650, y: 180, r: 26, type: 'tree' },
+  { x: 950, y: 140, r: 22, type: 'rock' },
+  { x: 1050, y: 350, r: 28, type: 'tree' },
+  { x: 820, y: 450, r: 18, type: 'rock' },
+  { x: 500, y: 400, r: 25, type: 'tree' },
+  { x: 200, y: 480, r: 20, type: 'rock' },
+  { x: 100, y: 750, r: 24, type: 'tree' },
+  { x: 380, y: 820, r: 22, type: 'rock' },
+  { x: 700, y: 780, r: 28, type: 'tree' },
+  { x: 1000, y: 720, r: 20, type: 'rock' },
+  { x: 900, y: 1050, r: 26, type: 'tree' },
+  { x: 600, y: 1100, r: 20, type: 'rock' },
+  { x: 300, y: 1050, r: 25, type: 'tree' },
+  { x: 150, y: 1000, r: 18, type: 'rock' },
+  { x: 550, y: 650, r: 24, type: 'tree' },
+  { x: 850, y: 880, r: 20, type: 'rock' },
+  { x: 450, y: 250, r: 18, type: 'rock' },
+  { x: 1100, y: 550, r: 25, type: 'tree' },
 ];
 
 const PALETTE = {
@@ -30,9 +33,6 @@ const PALETTE = {
     grassBase: '#8BC34A',
     grassPatchA: '#7CB342',
     grassPatchB: '#9CCC65',
-    // Warna speckle rumput, di-sample dari assets-image/object/ground/GRASS+.png
-    // (tile hijau tua). Dipakai sebagai noise organik, bukan tile berulang,
-    // supaya tidak ada seam.
     grassSpeckle: ['#3B7D4F', '#63AB3F', '#2F5753'],
     treeCanopy: '#2E7D32',
     treeHighlight: '#66BB6A',
@@ -55,8 +55,6 @@ const PALETTE = {
   },
 };
 
-// PRNG deterministik (mulberry32) — supaya speckle rumput konsisten tiap kali
-// cache dibangun ulang (tidak "berkedip" beda posisi kalau di-rebuild).
 function mulberry32(seed) {
   return function () {
     seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
@@ -68,7 +66,7 @@ function mulberry32(seed) {
 
 function drawGrassSpeckle(ctx, p) {
   const rand = mulberry32(1337);
-  const count = 900; // kepadatan speckle di seluruh dunia 390x640
+  const count = 3000; // Ditingkatkan untuk peta 1200x1200
   for (let i = 0; i < count; i++) {
     const x = rand() * WORLD_W;
     const y = rand() * WORLD_H;
@@ -134,18 +132,18 @@ function buildCache(isNight) {
   ctx.fillStyle = p.grassBase;
   ctx.fillRect(0, 0, WORLD_W, WORLD_H);
 
-  // Tekstur rumput: speckle noise (warna dari GRASS+.png), digambar sekali
-  // ke cache — tidak ada biaya per-frame.
   drawGrassSpeckle(ctx, p);
 
   ctx.globalAlpha = 0.5;
   const patches = [
-    [40, 40, 30, 16, p.grassPatchA], [150, 90, 34, 18, p.grassPatchB],
-    [280, 40, 26, 14, p.grassPatchA], [340, 150, 30, 16, p.grassPatchB],
-    [60, 200, 28, 15, p.grassPatchB], [220, 260, 26, 14, p.grassPatchA],
-    [120, 340, 30, 16, p.grassPatchA], [300, 320, 28, 15, p.grassPatchB],
-    [50, 480, 30, 16, p.grassPatchA], [250, 470, 26, 14, p.grassPatchB],
-    [150, 580, 30, 16, p.grassPatchA], [330, 600, 24, 13, p.grassPatchB],
+    [100, 100, 45, 25, p.grassPatchA], [350, 200, 50, 30, p.grassPatchB],
+    [700, 150, 40, 22, p.grassPatchA], [1050, 250, 48, 28, p.grassPatchB],
+    [200, 450, 42, 24, p.grassPatchB], [600, 500, 55, 32, p.grassPatchA],
+    [950, 550, 45, 26, p.grassPatchA], [1100, 850, 50, 30, p.grassPatchB],
+    [150, 800, 48, 28, p.grassPatchA], [450, 900, 42, 25, p.grassPatchB],
+    [750, 1050, 52, 30, p.grassPatchA], [1000, 1100, 40, 22, p.grassPatchB],
+    [500, 150, 38, 20, p.grassPatchA], [850, 350, 44, 26, p.grassPatchB],
+    [300, 650, 46, 28, p.grassPatchA], [700, 750, 40, 24, p.grassPatchB],
   ];
   for (const [x, y, rx, ry, color] of patches) {
     ctx.fillStyle = color;
@@ -155,9 +153,6 @@ function buildCache(isNight) {
   }
   ctx.globalAlpha = 1;
 
-  // Rock statis dimasukkan ke cache (murah, tidak beranimasi).
-  // Tree TIDAK di-cache di sini karena beranimasi — digambar per-frame di
-  // drawBackground() lewat drawTreesAnimated().
   for (const o of OBSTACLES) {
     if (o.type === 'rock') {
       if (spriteReady('rock')) {
@@ -166,18 +161,19 @@ function buildCache(isNight) {
         drawRock(ctx, o.x, o.y, o.r, p);
       }
     } else if (o.type === 'tree' && !spriteReady('tree')) {
-      // Kalau sprite tree tidak ada, pakai versi primitif (statis) di cache.
       drawTree(ctx, o.x, o.y, o.r, p);
     }
   }
 
   if (isNight) {
     ctx.fillStyle = '#EAF2FF';
-    const stars = [[30, 20], [90, 12], [160, 24], [230, 14], [300, 22], [360, 16], [60, 40]];
-    for (const [x, y] of stars) {
-      ctx.globalAlpha = 0.6 + Math.random() * 0.2;
+    const rand = mulberry32(777);
+    for (let i = 0; i < 50; i++) {
+      const x = rand() * WORLD_W;
+      const y = rand() * WORLD_H;
+      ctx.globalAlpha = 0.5 + rand() * 0.4;
       ctx.beginPath();
-      ctx.arc(x, y, 1.3, 0, Math.PI * 2);
+      ctx.arc(x, y, 1.2 + rand() * 0.8, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.globalAlpha = 1;
@@ -190,24 +186,15 @@ export function drawBackground(ctx, isNight) {
   const key = isNight ? 'night' : 'day';
   if (!cache[key]) buildCache(isNight);
   ctx.drawImage(cache[key], 0, 0);
-  // Pohon beranimasi digambar di atas cache (kalau sprite tree tersedia).
   drawTreesAnimated(ctx, isNight);
 }
 
-// Pohon animasi (16 frame ayunan). Semua pohon pakai frame yang sama tapi
-// di-offset fase-nya biar tidak bergerak seragam. Kalau sprite tree tidak
-// ada, ini no-op (versi primitif sudah masuk cache).
 function drawTreesAnimated(ctx, isNight) {
   if (!spriteReady('tree')) return;
   const t = performance.now() / 1000;
   for (const o of OBSTACLES) {
     if (o.type !== 'tree') continue;
     const frame = frameForClip('tree', t + o.x * 0.03, 8, 'pingpong').index;
-    // Pohon digambar lebih besar dari radius collision-nya biar proporsional.
     drawSprite(ctx, 'tree', o.x, o.y - o.r * 0.6, o.r * 4.0, frame);
-  }
-  if (isNight) {
-    // Redupkan sedikit pohon di malam hari biar menyatu dg suasana.
-    // (opsional; night mask utama tetap dari game.drawNightMask)
   }
 }
