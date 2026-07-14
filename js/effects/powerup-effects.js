@@ -1,11 +1,13 @@
-export const POWERUP_TYPES = ['life', 'damage', 'speed', 'range'];
+export const POWERUP_TYPES = ['life', 'damage', 'speed'];
 
 export const POWERUP_META = {
   life: { color: '#FF5470', label: '+Nyawa' },
   damage: { color: '#FF6F59', label: 'Damage+' },
   speed: { color: '#FFC857', label: 'Cepat!' },
-  range: { color: '#2DE1C7', label: 'Cahaya Terang!' },
 };
+
+const DAMAGE_BUFF_SECONDS = 8;
+const SPEED_BUFF_SECONDS = 6;
 
 export function applyPowerUp(type, player, game) {
   switch (type) {
@@ -16,18 +18,14 @@ export function applyPowerUp(type, player, game) {
     case 'damage':
       // Peluru sakit sementara waktu (+5 damage selama 8 detik)
       player.baseDamage += 5;
-      setTimeout(() => { player.baseDamage -= 5; }, 8000);
+      player.damageBuffUntil = game.elapsedTime + DAMAGE_BUFF_SECONDS;
+      setTimeout(() => { player.baseDamage -= 5; }, DAMAGE_BUFF_SECONDS * 1000);
       break;
     case 'speed':
       // Kecepatan lari bertambah drastis sementara (+40 speed selama 6 detik)
       player.baseSpeed += 40;
-      setTimeout(() => { player.baseSpeed -= 40; }, 6000);
-      break;
-    case 'range':
-      // Memperlebar jangkauan tembakan peluru selama 12 detik
-      player.rangeBuffUntil = game.elapsedTime + 12;
-      // Memperbesar lingkaran senter cahaya di malam hari (Level 3) selama 12 detik!
-      player.visionBuffUntil = game.elapsedTime + 12;
+      player.speedBuffUntil = game.elapsedTime + SPEED_BUFF_SECONDS;
+      setTimeout(() => { player.baseSpeed -= 40; }, SPEED_BUFF_SECONDS * 1000);
       break;
   }
 }

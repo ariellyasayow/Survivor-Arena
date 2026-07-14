@@ -12,11 +12,11 @@ import { WORLD_W, WORLD_H, OBSTACLES, drawBackground } from './world/background.
 import { updateHUD } from './ui/hud.js';
 import { updateVFX, drawVFX, spawnHitParticles, spawnLevelUpBurst, spawnFloatingText, clearVFX } from './effects/vfx.js';
 import { sfxShoot, sfxHit, sfxPoint, sfxLevelUp, sfxPowerUp, sfxMonster, sfxGameOver, sfxExplosion, sfxLaser, sfxSwing } from './effects/sfx.js';
-import { POWERUP_TYPES, applyPowerUp } from './effects/powerup-effects.js';
+import { POWERUP_TYPES, POWERUP_META, applyPowerUp } from './effects/powerup-effects.js';
 import { circleCollide, distance, randRange, randInt, randomEdgePoint } from './utils/helpers.js';
 import { spriteReady } from './utils/assets.js';
 import { viewport, camera, updateCamera } from './viewport.js';
-import { VIEWPORT_W, VIEWPORT_H } from './config.js';
+import { VIEWPORT_W, VIEWPORT_H, MINIMAP_W, MINIMAP_H, MINIMAP_MARGIN } from './config.js';
 import { isLowQuality } from './quality.js';
 
 export const CONFIG = {
@@ -25,7 +25,7 @@ export const CONFIG = {
   STAGE_TIME: [45, 40, 40],
   BASE_ENEMY_HP: 18,
   BASE_ENEMY_DAMAGE: 1,
-  ENEMY_HP_GROWTH_PER_STAGE: 1.3,
+  ENEMY_HP_GROWTH_PER_STAGE: 1.35,
   ENEMY_DMG_GROWTH_PER_STAGE: 1,
   ENEMY_SPEED: 55,
   ENEMY_SPAWN_INTERVAL: 1.8,
@@ -77,6 +77,7 @@ export class Game {
 
   reset() {
     this.state = 'intro';
+    this.deathReason = null;
     this.elapsedTime = 0;
     this.stageIndex = 0;
     this.stageCount = CONFIG.STAGE_COUNT;
@@ -111,7 +112,7 @@ export class Game {
 
     if (overlayTitleEl) {
       overlayTitleEl.textContent = 'Survivor Arena';
-      overlayMessageEl.textContent = 'Kumpulkan poin, hindari & hajar musuh, bertahan sampai waktu habis.\nLevel terakhir akan gelap.';
+      overlayMessageEl.textContent = 'Welcome to Survivor Arena!';
       overlayButtonEl.textContent = 'Mulai';
       if (overlayEl) overlayEl.classList.remove('hidden');
     }
@@ -156,18 +157,12 @@ export class Game {
     this.points.push(new PointItem(x, y, 1));
   }
 
-  // --- POWER UP RANGE HANYA MUNCUL DI LEVEL 3 (MALAM) ---
   spawnPowerUp() {
     const margin = 24;
     const x = randRange(margin, WORLD_W - margin);
     const y = randRange(margin, WORLD_H - margin);
-    
-    const availableTypes = POWERUP_TYPES.filter(type => {
-      if (type === 'range' && !this.isNight) return false;
-      return true;
-    });
 
-    const type = availableTypes[randInt(0, availableTypes.length - 1)];
+    const type = POWERUP_TYPES[randInt(0, POWERUP_TYPES.length - 1)];
     this.powerUps.push(new PowerUpItem(x, y, type));
   }
 
@@ -344,8 +339,7 @@ export class Game {
         if (pu.type === 'life') text = '+1 Nyawa!';
         if (pu.type === 'damage') text = 'Peluru Sakit!';
         if (pu.type === 'speed') text = 'Lari Cepat!';
-        if (pu.type === 'range') text = 'Cahaya Terang!';
-        
+
         spawnFloatingText(pu.x, pu.y - 20, text, '#FFC857');
         sfxPowerUp();
       }
@@ -393,8 +387,9 @@ export class Game {
     if (this.stageScore >= this.stageTarget) {
       this.advanceStage();
     } else if (this.timeLeft <= 0) {
-      this.timeLeft = CONFIG.STAGE_TIME[this.stageIndex];
-      this.onPlayerHit(1, { fromTimeout: true });
+      this.timeLeft = 0;
+      this.deathReason = 'timeout';
+      this.startPlayerDeath();
     }
 
     updateHUD(this);
@@ -429,14 +424,15 @@ export class Game {
     }
   }
 
-  onPlayerHit(damage = 1, { fromTimeout = false, instantKill = false } = {}) {
-    if (!fromTimeout && this.player.isInvulnerable(this.elapsedTime)) return;
+  onPlayerHit(damage = 1, { instantKill = false } = {}) {
+    if (this.player.isInvulnerable(this.elapsedTime)) return;
     this.lives -= instantKill ? this.lives : damage;
     if (this.lives < 0) this.lives = 0;
     this.player.takeHit(this.elapsedTime, 1.2);
     spawnHitParticles(this.player.x, this.player.y, '#FF5470', 10);
     sfxHit();
     if (this.lives <= 0) {
+      this.deathReason = 'defeated';
       this.startPlayerDeath();
     }
   }
@@ -476,9 +472,12 @@ export class Game {
     
     if (overlayTitleEl) {
       overlayTitleEl.textContent = won ? 'Kamu selamat!' : 'Game over';
+      const lossReason = this.deathReason === 'timeout'
+        ? `Waktu habis di level ${this.stageIndex + 1}`
+        : `Kehabisan nyawa di level ${this.stageIndex + 1}`;
       overlayMessageEl.textContent = won
         ? `Semua level selesai. Skor akhir: ${this.score}`
-        : `Kehabisan nyawa di level ${this.stageIndex + 1}. Skor akhir: ${this.score}`;
+        : `${lossReason}. Skor akhir: ${this.score}`;
       overlayButtonEl.textContent = 'Main lagi';
       if (overlayEl) overlayEl.classList.remove('hidden');
     }
@@ -556,9 +555,9 @@ export class Game {
   }
 
   drawMiniMap(ctx) {
-    const mapW = 90;
-    const mapH = 90;
-    const margin = 12;
+    const mapW = MINIMAP_W;
+    const mapH = MINIMAP_H;
+    const margin = MINIMAP_MARGIN;
     const mapX = VIEWPORT_W - mapW - margin;
     const mapY = margin;
 
@@ -571,6 +570,38 @@ export class Game {
 
     const scaleX = mapW / WORLD_W;
     const scaleY = mapH / WORLD_H;
+
+    ctx.fillStyle = '#FFC857';
+    for (const pt of this.points) {
+      if (pt.collected) continue;
+      ctx.beginPath();
+      ctx.arc(mapX + pt.x * scaleX, mapY + pt.y * scaleY, 1.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    for (const pu of this.powerUps) {
+      if (pu.collected) continue;
+      const meta = POWERUP_META[pu.type];
+      const px = mapX + pu.x * scaleX;
+      const py = mapY + pu.y * scaleY;
+
+      if (pu.type === 'life') {
+        ctx.fillStyle = meta ? meta.color : '#FF5470';
+        ctx.font = '8px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('❤', px, py + 0.5);
+        continue;
+      }
+
+      ctx.fillStyle = meta ? meta.color : '#2DE1C7';
+      ctx.beginPath();
+      ctx.arc(px, py, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+      ctx.lineWidth = 0.6;
+      ctx.stroke();
+    }
 
     ctx.fillStyle = '#FF5470';
     for (const e of this.allEnemies()) {

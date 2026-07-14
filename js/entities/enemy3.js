@@ -37,6 +37,11 @@ export class Enemy3 {
     this.laserFrame = 8;                                      // frame pelepasan laser
     this.laserFireTime = this.laserFrame / this.attackFps;    // 2.0s
     this.firedThisCycle = false; // sudah tembak di siklus animasi ini?
+
+    // Fire rate diturunkan 35%: jeda ekstra di antara siklus tembak
+    // (kecepatan animasi windup/laser sendiri tidak berubah).
+    this.refireCooldown = 0;
+    this.refireDelay = this.attackDuration * 0.35;
   }
 
   update(dt, target, elapsedTime, obstacles) {
@@ -60,17 +65,31 @@ export class Enemy3 {
         this.attacking = true;
         this.attackTime = 0;
         this.firedThisCycle = false;
+        this.refireCooldown = 0;
       }
-      this.attackTime += dt; // maju animasi attack di update (bukan draw)
-      // Selesai satu siklus animasi → ulang dari awal.
-      if (this.attackTime >= this.attackDuration) {
-        this.attackTime -= this.attackDuration;
-        this.firedThisCycle = false;
+
+      if (this.refireCooldown > 0) {
+        // Jeda fire rate: animasi ditahan di frame terakhir sampai jeda habis.
+        this.refireCooldown -= dt;
+        if (this.refireCooldown <= 0) {
+          this.attackTime = 0;
+          this.firedThisCycle = false;
+        }
+      } else {
+        this.attackTime += dt; // maju animasi attack di update (bukan draw)
+        if (this.attackTime >= this.attackDuration) {
+          // Selesai satu siklus animasi → mulai jeda fire rate sebelum siklus
+          // baru. Waktu dipatok tepat di frame terakhir (bukan attackDuration
+          // penuh) supaya frameForClip (mode loop) tidak wrap balik ke frame 0.
+          this.attackTime = (this.attackFrames - 1) / this.attackFps;
+          this.refireCooldown = this.refireDelay;
+        }
       }
     } else {
       this.attacking = false;
       this.attackTime = 0;
       this.firedThisCycle = false;
+      this.refireCooldown = 0;
     }
 
     // Menghadap ke arah player
@@ -132,7 +151,8 @@ export class Enemy3 {
   }
 
   // Enemy3 melepas laser tepat saat animasi mencapai frame pelepasan (sekali
-  // per siklus animasi). game.js memanggil ini tiap frame.
+  // per siklus animasi, dan hanya kalau cooldown fire rate sudah habis).
+  // game.js memanggil ini tiap frame.
   shouldFireLaser() {
     if (!this.attacking || this.dying || this.firedThisCycle) return false;
     if (this.attackTime >= this.laserFireTime) {

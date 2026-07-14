@@ -8,6 +8,7 @@ import {
   QUALITY_DROP_FRAMES, MAX_PARTICLES_HIGH, MAX_PARTICLES_LOW,
 } from './config.js';
 import { initFpsMeter, tickFpsMeter } from './debug/fpsMeter.js';
+import { initTutorial, notifyInput, isBlockingGameplay, reposition as repositionTutorial } from './tutorial.js';
 
 // Tampilkan FPS meter di pojok layar (buat tes performa langsung di HP tanpa
 // kabel/DevTools). Tambahkan ?fps=0 di URL untuk menyembunyikannya.
@@ -19,7 +20,10 @@ const canvas = document.getElementById('game-canvas');
 
 // ---- Layout: canvas full-screen + skala letterbox (jaga rasio) -------------
 resizeViewport(canvas);
-window.addEventListener('resize', () => resizeViewport(canvas));
+window.addEventListener('resize', () => {
+  resizeViewport(canvas);
+  repositionTutorial();
+});
 
 const game = new Game(canvas);
 
@@ -46,21 +50,31 @@ window.addEventListener('keyup', (e) => {
   if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
 });
 
-// ---- Virtual joystick (buat mobile/touch) ----------------------------------
-// Joystick memakai koordinat relatif ke base DOM-nya sendiri, jadi TIDAK
-// terpengaruh skala/letterbox canvas.
+// ---- Virtual joystick floating (buat mobile/touch) --------------------------
+// Joystick TIDAK terkunci di satu posisi: muncul tepat di titik jari user
+// pertama menyentuh zona kiri layar (#touch-controls), lalu drag dihitung
+// relatif terhadap titik sentuh awal itu (origin), bukan posisi DOM tetap.
+const touchZone = document.getElementById('touch-controls');
 const joystickBase = document.getElementById('joystick-base');
 const joystickStick = document.getElementById('joystick-stick');
 let joystickVector = { x: 0, y: 0 };
 let activeTouchId = null;
+let originX = 0;
+let originY = 0;
 const JOYSTICK_MAX = 34;
 
+function showJoystickAt(clientX, clientY) {
+  const rect = touchZone.getBoundingClientRect();
+  originX = clientX;
+  originY = clientY;
+  joystickBase.style.left = `${clientX - rect.left}px`;
+  joystickBase.style.top = `${clientY - rect.top}px`;
+  joystickBase.classList.add('active');
+}
+
 function joystickPointFromEvent(clientX, clientY) {
-  const rect = joystickBase.getBoundingClientRect();
-  const cx = rect.left + rect.width / 2;
-  const cy = rect.top + rect.height / 2;
-  let dx = clientX - cx;
-  let dy = clientY - cy;
+  let dx = clientX - originX;
+  let dy = clientY - originY;
   const dist = Math.hypot(dx, dy);
   if (dist > JOYSTICK_MAX) {
     dx = (dx / dist) * JOYSTICK_MAX;
@@ -71,25 +85,19 @@ function joystickPointFromEvent(clientX, clientY) {
 }
 
 function resetJoystick() {
+  joystickBase.classList.remove('active');
   joystickStick.style.transform = 'translate(0px, 0px)';
   joystickVector = { x: 0, y: 0 };
   activeTouchId = null;
 }
 
-// --- PENGAMAN TAMBAHAN: Reset semua input (joystick & keyboard) ---
-function resetAllInputs() {
-  resetJoystick();
-  keys.up = false;
-  keys.down = false;
-  keys.left = false;
-  keys.right = false;
-}
-
-joystickBase.addEventListener('touchstart', (e) => {
+touchZone.addEventListener('touchstart', (e) => {
+  if (activeTouchId !== null) return; // sudah ada jari aktif, abaikan sentuhan lain
   if (e.cancelable) e.preventDefault();
   unlockAudio();
   const t = e.changedTouches[0];
   activeTouchId = t.identifier;
+  showJoystickAt(t.clientX, t.clientY);
   joystickPointFromEvent(t.clientX, t.clientY);
 }, { passive: false });
 
@@ -125,11 +133,28 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) resetAllInputs();
 });
 
+window.addEventListener('touchcancel', (e) => {
+  for (const t of e.changedTouches) {
+    if (t.identifier === activeTouchId) resetJoystick();
+  }
+});
+
+window.addEventListener('touchcancel', (e) => {
+  for (const t of e.changedTouches) {
+    if (t.identifier === activeTouchId) resetJoystick();
+  }
+});
+
 // Klik untuk unlock audio (aturan autoplay browser)
 window.addEventListener('pointerdown', () => unlockAudio());
 
 // Cegah context-menu (long-press) & seleksi teks saat interaksi di canvas.
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+// ---- Tutorial interaktif "How to Play" -------------------------------------
+// Menggantikan hint swipe sederhana sebelumnya: sekarang menyorot tiap
+// komponen HUD lalu diakhiri tutorial gerakan (lihat js/tutorial.js).
+initTutorial(canvas);
 
 function currentInputVector() {
   let x = joystickVector.x;
@@ -194,7 +219,10 @@ function loop(now) {
   checkPerformance(dt);
 
   const input = currentInputVector();
-  game.update(dt, input);
+  notifyInput(input.x, input.y);
+  // Selama langkah HUD tutorial (1-5), gameplay dijeda supaya pemain fokus
+  // baca tooltip; render tetap jalan agar layar tidak kosong di baliknya.
+  if (!isBlockingGameplay()) game.update(dt, input);
   game.render();
 
   requestAnimationFrame(loop);
