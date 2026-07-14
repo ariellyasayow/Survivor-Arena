@@ -36,7 +36,7 @@ export const CONFIG = {
   POWERUP_SPAWN_INTERVAL: 9,
   MAX_LIVES: 5,
   START_LIVES: 3,
-  XP_TO_LEVEL_BASE: 40,
+  XP_TO_LEVEL_BASE: 100,
   NIGHT_VISION_RADIUS: 140,
 };
 
@@ -403,25 +403,25 @@ export class Game {
   onPointCollected(pt) {
     this.score += 10 * pt.value;
     this.stageScore += pt.value;
-    this.xp += 8;
     spawnFloatingText(pt.x, pt.y, '+10', '#FFC857');
     sfxPoint();
-    this.checkPowerLevelUp();
   }
 
   onEnemyKilled(enemy) {
     this.score += 15;
-    this.xp += 12;
-    spawnFloatingText(enemy.x, enemy.y - 10, '+15', '#FF6F59');
+    this.xp += 10; // Player mendapat 10 XP MURNI dari membunuh musuh
+    spawnFloatingText(enemy.x, enemy.y - 10, '+10 XP', '#FF6F59');
     this.checkPowerLevelUp();
   }
 
   checkPowerLevelUp() {
     if (this.xp >= this.xpToNextLevel) {
-      this.xp -= this.xpToNextLevel;
+      this.xp -= this.xpToNextLevel; // Simpan sisa kelebihan XP
       this.powerLevel += 1;
       this.player.powerLevel = this.powerLevel;
-      this.xpToNextLevel = Math.round(this.xpToNextLevel * 1.25);
+      
+      // KUNCI BERIKUTNYA LEBIH LAMA: Syarat XP dilipatgandakan 2x lipat (2.0)!
+      this.xpToNextLevel = Math.round(this.xpToNextLevel * 2.0); 
       
       spawnLevelUpBurst(this.player.x, this.player.y);
       spawnFloatingText(this.player.x, this.player.y - 30, 'LEVEL UP! Damage+', '#2DE1C7');
