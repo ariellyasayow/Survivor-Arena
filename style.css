@@ -80,6 +80,15 @@ html, body {
   color: var(--accent-gold);
 }
 
+/* Dibungkus satu wadah supaya kotak highlight tutorial pas & presisi (tidak
+   melebar ke elemen lain saat HUD wrap di layar mobile sempit). */
+#target-time {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 #timer {
   font-variant-numeric: tabular-nums;
   color: #fff;
@@ -90,7 +99,7 @@ html, body {
   color: var(--text-light);
 }
 
-/* --- BAR XP (DAMAGE) DI BAWAH NYA --- */
+/* --- BAR XP DI BAWAH NYA --- */
 #hud-bottom {
   display: flex;
   align-items: center;
@@ -98,6 +107,23 @@ html, body {
   margin-top: 8px;
   width: 100%;
   max-width: 260px; /* Dibatasi agar bar tidak terlalu panjang/lebar */
+}
+
+/* Lingkaran berisi angka level (XP), sengaja dibedakan bentuk & warnanya dari
+   #stage-label ("Lvl 1/3") supaya tidak rancu — warnanya disamakan dengan
+   warna bar XP (accent-teal), bukan gold seperti label stage. */
+#level-badge {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: bold;
+  color: var(--bg-deep);
+  background: var(--accent-teal);
+  border-radius: 50%;
 }
 
 #xp-label {
@@ -125,6 +151,66 @@ html, body {
   transition: width 0.15s ease-out;
 }
 
+/* --- Indikator power-up aktif (damage/speed) beserta sisa waktu --- */
+#buff-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+  max-width: 170px;
+}
+
+.buff-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: rgba(11, 15, 43, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  backdrop-filter: blur(2px);
+}
+
+.buff-badge .buff-icon {
+  font-size: 13px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.buff-badge .buff-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.buff-badge .buff-name {
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.buff-badge .buff-track {
+  height: 4px;
+  margin-top: 3px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.buff-badge .buff-fill {
+  height: 100%;
+  transition: width 0.1s linear;
+}
+
+.buff-badge .buff-time {
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+  flex-shrink: 0;
+}
+
 #overlay {
   position: absolute;
   inset: 0;
@@ -134,27 +220,37 @@ html, body {
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 24px;
+  padding: 20px;
   z-index: 10;
+  overflow-y: auto;
 }
 
 #overlay.hidden {
   display: none;
 }
 
+#overlay-card {
+  width: 100%;
+  max-width: 360px;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
 #overlay-title {
   font-size: 26px;
   font-weight: bold;
   color: var(--accent-gold);
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 #overlay-message {
-  font-size: 14px;
-  line-height: 1.6;
+  font-size: 15px;
+  line-height: 1.5;
   color: var(--text-light);
-  max-width: 300px;
-  margin-bottom: 20px;
+  max-width: 320px;
+  margin-bottom: 28px;
   white-space: pre-line;
 }
 
@@ -162,34 +258,270 @@ html, body {
   background: var(--accent-coral);
   color: #1a1a1a;
   border: none;
-  padding: 12px 32px;
+  padding: 13px 40px;
   font-size: 16px;
   font-weight: bold;
   border-radius: 24px;
   cursor: pointer;
+  box-shadow: 0 4px 14px rgba(255, 111, 89, 0.4);
 }
 
 #overlay-button:active {
   transform: scale(0.97);
 }
 
-/* Penataan Joystick statis di pojok kiri bawah */
+/* --- Tombol bantuan: buka ulang tutorial "Cara Main" kapan saja --- */
+#howto-btn {
+  position: absolute;
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+  z-index: 8;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(11, 15, 43, 0.6);
+  color: var(--text-light);
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+  backdrop-filter: blur(2px);
+}
+
+#howto-btn:active {
+  transform: scale(0.94);
+}
+
+/* ==========================================================================
+   Tutorial interaktif "How to Play"
+   - Spotlight dibuat dengan 1 elemen absolute + box-shadow raksasa (teknik
+     "spotlight overlay" murah): tidak perlu canvas/SVG mask, cukup 1 paint
+     setiap kali langkah berpindah (bukan tiap frame) → sangat ringan.
+   - Semua animasi memakai opacity/transform saja supaya GPU-composited.
+   ========================================================================== */
+#tutorial-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  opacity: 1;
+  transition: opacity 0.35s ease;
+}
+
+#tutorial-overlay.hidden {
+  display: none;
+}
+
+#tutorial-overlay.fade-out {
+  opacity: 0;
+}
+
+/* Selama langkah gerakan (terakhir), biarkan sentuhan tembus ke joystick. */
+#tutorial-overlay.step-movement {
+  pointer-events: none;
+}
+
+#tutorial-spotlight {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 9999px rgba(5, 7, 15, 0.8),
+    0 0 0 3px rgba(45, 225, 199, 0.9),
+    0 0 22px 4px rgba(45, 225, 199, 0.55);
+  transition: left 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              top 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              border-radius 0.35s ease,
+              opacity 0.3s ease;
+  opacity: 0;
+}
+
+#tutorial-spotlight.show {
+  opacity: 1;
+}
+
+#tutorial-tooltip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 240px;
+  max-width: calc(100vw - 32px);
+  background: var(--panel);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  transform: scale(0.92);
+  transition: left 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              top 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.25s ease,
+              transform 0.25s ease;
+}
+
+#tutorial-tooltip.show {
+  opacity: 1;
+  transform: scale(1);
+}
+
+#tutorial-progress {
+  display: inline-block;
+  font-size: 10.5px;
+  font-weight: bold;
+  color: var(--accent-teal);
+  background: rgba(45, 225, 199, 0.12);
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-bottom: 8px;
+  letter-spacing: 0.3px;
+}
+
+#tutorial-text {
+  margin: 0 0 12px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-light);
+}
+
+#tutorial-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+#tutorial-actions button {
+  border: none;
+  border-radius: 999px;
+  padding: 7px 16px;
+  font-size: 12.5px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+#tutorial-skip {
+  background: transparent;
+  color: rgba(234, 242, 255, 0.6);
+}
+
+#tutorial-next {
+  background: var(--accent-coral);
+  color: #1a1a1a;
+}
+
+#tutorial-next:active,
+#tutorial-skip:active {
+  transform: scale(0.96);
+}
+
+/* --- Langkah terakhir: tutorial gerakan (swipe) --- */
+#tutorial-swipe {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 21;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  pointer-events: auto;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+#tutorial-swipe.show {
+  opacity: 1;
+}
+
+#tutorial-swipe.hidden {
+  display: none;
+}
+
+#swipe-ring {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  border: 2px dashed rgba(45, 225, 199, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#swipe-hand {
+  font-size: 30px;
+  line-height: 1;
+  will-change: transform;
+  animation: swipe-bounce 1.6s ease-in-out infinite;
+  filter: drop-shadow(0 0 8px rgba(45, 225, 199, 0.7));
+}
+
+#swipe-text {
+  margin: 0;
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--accent-teal);
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.9);
+  text-align: center;
+}
+
+#tutorial-skip-swipe {
+  border: none;
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-size: 11.5px;
+  font-weight: bold;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(234, 242, 255, 0.75);
+  cursor: pointer;
+}
+
+@keyframes swipe-bounce {
+  0%, 100% { transform: translateY(-16px); }
+  50%      { transform: translateY(16px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #swipe-hand { animation: none; }
+}
+
+/* Zona sentuh gerak: separuh kiri layar. Joystick floating muncul tepat di
+   titik jari user menyentuh, bukan terkunci di satu posisi tetap. */
 #touch-controls {
   position: absolute;
-  left: 24px;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+  inset: 0;
+  width: 55%;
+  height: 100%;
   z-index: 6;
+  touch-action: none;
 }
 
 #joystick-base {
+  position: absolute;
+  left: 0;
+  top: 0;
   width: 96px;
   height: 96px;
+  margin-left: -48px;
+  margin-top: -48px;
   border-radius: 50%;
   background: rgba(255,255,255,0.08);
   border: 1px solid rgba(255,255,255,0.15);
   display: flex;
   align-items: center;
   justify-content: center;
+  opacity: 0;
+  transform: scale(0.7);
+  transition: opacity 0.12s ease-out, transform 0.12s ease-out;
+  pointer-events: none;
+}
+
+#joystick-base.active {
+  opacity: 1;
+  transform: scale(1);
 }
 
 #joystick-stick {
@@ -198,10 +530,4 @@ html, body {
   border-radius: 50%;
   background: rgba(45, 225, 199, 0.55);
   transform: translate(0, 0);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  #touch-controls {
-    opacity: 0.35;
-  }
 }

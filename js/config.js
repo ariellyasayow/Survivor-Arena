@@ -10,6 +10,11 @@ export const VIEWPORT_H = 640; // Tinggi area layar yang terlihat
 // ── Presentasi / layout ─────────────────────
 export const MAX_DPR = 2;
 
+// ── Minimap (dipakai game.js untuk gambar & tutorial.js untuk highlight) ────
+export const MINIMAP_W = 90;
+export const MINIMAP_H = 90;
+export const MINIMAP_MARGIN = 12;
+
 // ── Particle system ─────────────────────────
 export const MAX_PARTICLES_HIGH = 60;
 export const MAX_PARTICLES_LOW = 24;

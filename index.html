@@ -14,25 +14,55 @@
     <div id="hud-top">
       <div id="lives"></div>
       <div id="stage-label">Lvl 1/3</div>
-      <div id="timer">00:45</div>
-      <div id="score">Skor: 0 | Target Poin: 0/15</div>
+      <div id="target-time">
+        <span id="timer">00:45</span>
+        <span id="score">Skor: 0 | Target Poin: 0/15</span>
+      </div>
     </div>
     <div id="hud-bottom">
-      <span id="xp-label">XP (Damage)</span>
+      <span id="level-badge">1</span>
+      <span id="xp-label">XP</span>
       <div id="xp-bar-track"><div id="xp-bar-fill"></div></div>
     </div>
+    <div id="buff-list"></div>
   </div>
 
   <canvas id="game-canvas"></canvas>
 
   <div id="overlay">
-    <div id="overlay-title">Survivor Arena</div>
-    <div id="overlay-message">Kumpulkan poin, hindari &amp; hajar musuh, bertahan sampai waktu habis. Level terakhir akan gelap.</div>
-    <button id="overlay-button">Mulai</button>
+    <div id="overlay-card">
+      <div id="overlay-title">Survivor Arena</div>
+      <div id="overlay-message">Welcome to Survivor Arena!</div>
+      <button id="overlay-button">Mulai</button>
+    </div>
   </div>
 
   <div id="touch-controls">
     <div id="joystick-base"><div id="joystick-stick"></div></div>
+  </div>
+
+  <!-- Tombol bantuan: tampilkan ulang tutorial "Cara Main" kapan saja -->
+  <button id="howto-btn" aria-label="Cara Main">?</button>
+
+  <!-- Tutorial interaktif "How to Play": spotlight + tooltip per elemen HUD,
+       lalu tutorial gerakan (swipe). Dikendalikan sepenuhnya oleh js/tutorial.js. -->
+  <div id="tutorial-overlay" class="hidden" aria-hidden="true">
+    <div id="tutorial-spotlight"></div>
+
+    <div id="tutorial-tooltip">
+      <div id="tutorial-progress">1/6</div>
+      <p id="tutorial-text"></p>
+      <div id="tutorial-actions">
+        <button id="tutorial-skip">Lewati</button>
+        <button id="tutorial-next">Lanjut</button>
+      </div>
+    </div>
+
+    <div id="tutorial-swipe" class="hidden">
+      <div id="swipe-ring"><div id="swipe-hand">👆</div></div>
+      <p id="swipe-text">Geser untuk menggerakkan karaktermu</p>
+      <button id="tutorial-skip-swipe">Lewati</button>
+    </div>
   </div>
 
 </div>

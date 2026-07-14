@@ -18,8 +18,8 @@ export class Player {
     this.baseRange = 160;
 
     this.fireCooldown = 0;
-    this.rangeBuffUntil = 0;
-    this.visionBuffUntil = 0;
+    this.damageBuffUntil = 0;
+    this.speedBuffUntil = 0;
 
     this.invulnerableUntil = 0;
 
@@ -117,12 +117,10 @@ export class Player {
   }
 
   currentVisionRadius(elapsedTime, baseRadius) {
-    if (elapsedTime < this.visionBuffUntil) return baseRadius * 1.6;
     return baseRadius;
   }
 
   currentBulletRange(elapsedTime) {
-    if (elapsedTime < this.rangeBuffUntil) return this.baseRange * 1.5;
     return this.baseRange;
   }
 
