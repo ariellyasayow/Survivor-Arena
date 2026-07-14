@@ -1,9 +1,11 @@
 export class Projectile {
   constructor() {
+    // Konstruktor kosong: instance dipakai ulang lewat pool (lihat reset()).
     this.active = false;
     this.reset(0, 0, 0, 0, 0, 0, false);
   }
 
+  // Isi ulang instance yang sama dengan data tembakan baru (dipakai pool).
   reset(x, y, dirX, dirY, range, damage, isEnemy = false) {
     this.x = x;
     this.y = y;
@@ -11,35 +13,29 @@ export class Projectile {
     this.startY = y;
     this.dirX = dirX;
     this.dirY = dirY;
-    
-    // Kecepatan awal: musuh sedang (200), player cepat (360)
-    this.speed = isEnemy ? 200 : 360; 
-    
+    this.speed = 320; // laser di-set 260 lewat isLaser sebelum update pertama
     this.vx = dirX * this.speed;
     this.vy = dirY * this.speed;
     this.range = range;
     this.damage = damage;
     this.r = 4;
     this.dead = false;
-    this.isEnemy = isEnemy; 
-    this.isLaser = false;   
+    this.isEnemy = isEnemy; // true = projectile dari enemy, false = dari player
+    this.isLaser = false;   // di-set true oleh game.js untuk laser enemy3
     this._laserSpeedApplied = false;
     return this;
   }
 
   update(dt) {
-    // --- KECEPATAN LASER SEIMBANG (MEDIUM SPEED) ---
-    // Awalmu: 520 (terlalu cepat)
-    // Barusan: 60 (terlalu lambat)
-    // Sekarang: 260 (PAS & SEIMBANG!)
+    // --- MODIFIKASI KECEPATAN LASER ---
+    // Diperlambat dari 520 ke 260 px/detik agar seimbang[cite: 4]
     if (this.isLaser && !this._laserSpeedApplied) {
-      this.speed = 260; // <-- DISET KE 260 PX/DETIK!
+      this.speed = 260; 
       this.vx = this.dirX * this.speed;
       this.vy = this.dirY * this.speed;
       this.r = 5;
       this._laserSpeedApplied = true;
     }
-    
     this.x += this.vx * dt;
     this.y += this.vy * dt;
     const traveled = Math.hypot(this.x - this.startX, this.y - this.startY);
@@ -48,18 +44,21 @@ export class Projectile {
 
   draw(ctx) {
     if (this.isLaser) {
+      // Laser: berkas garis dengan ekor bercahaya di belakang arah gerak.
       const tailLen = 18;
       const tx = this.x - this.dirX * tailLen;
       const ty = this.y - this.dirY * tailLen;
       ctx.save();
       ctx.lineCap = 'round';
-      ctx.strokeStyle = 'rgba(255, 84, 112, 0.35)';
+      // Halo luar
+      ctx.strokeStyle = 'rgba(180, 255, 120, 0.35)';
       ctx.lineWidth = this.r * 2.4;
       ctx.beginPath();
       ctx.moveTo(tx, ty);
       ctx.lineTo(this.x, this.y);
       ctx.stroke();
-      ctx.strokeStyle = '#FF5470';
+      // Inti terang
+      ctx.strokeStyle = '#C6FF6B';
       ctx.lineWidth = this.r;
       ctx.beginPath();
       ctx.moveTo(tx, ty);
@@ -69,7 +68,8 @@ export class Projectile {
       return;
     }
 
-    ctx.fillStyle = this.isEnemy ? '#FF5470' : '#FFC857';
+    // Peluru biasa (bulatan): gold untuk player, biru gelap untuk enemy.
+    ctx.fillStyle = this.isEnemy ? '#6C7AA8' : '#FFC857';
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
     ctx.fill();

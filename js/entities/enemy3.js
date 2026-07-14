@@ -28,14 +28,13 @@ export class Enemy3 {
     this.attacking = false;
     this.attackTime = 0;
     this.attackRange = 240;  // 1.5x player range (160 * 1.5)
-    
-    // VERSI SEIMBANG (BALANCED): Kecepatan animasi diatur ke 4 FPS
-    // Musuh menembak setiap 2.25 detik sekali (pas, tidak kecepatan & tidak kelambatan!)
-    this.attackFps = 4;
+    // Siklus animasi attack: 9 frame @ 10fps = 0.9s. Laser dilepas saat animasi
+    // mencapai frame "mulut terbuka penuh" (frame 8 ≈ 0.8s), lalu reset.
+    this.attackFps = 10;
     this.attackFrames = 9;
-    this.attackDuration = this.attackFrames / this.attackFps; // 2.25s
-    this.laserFrame = 8;                                      // frame pelepasan laser
-    this.laserFireTime = this.laserFrame / this.attackFps;    // 2.0s
+    this.attackDuration = this.attackFrames / this.attackFps; // 0.9s
+    this.laserFrame = 8;                                       // frame pelepasan laser
+    this.laserFireTime = this.laserFrame / this.attackFps;    // 0.8s
     this.firedThisCycle = false; // sudah tembak di siklus animasi ini?
 
     // Fire rate diturunkan 35%: jeda ekstra di antara siklus tembak
@@ -176,8 +175,7 @@ export class Enemy3 {
       frame = frameForClip('enemy3Death', this.deathTime, 10, 'once').index;
     } else if (this.attacking) {
       clip = 'enemy3Attack';
-      // Kecepatan animasi diatur ke 4 FPS agar selaras dengan waktu tembaknya
-      frame = frameForClip('enemy3Attack', this.attackTime, 4, 'loop').index;
+      frame = frameForClip('enemy3Attack', this.attackTime, 10, 'loop').index;
     }
 
     if (spriteReady(clip)) {
