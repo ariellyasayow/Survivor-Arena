@@ -76,6 +76,15 @@ function resetJoystick() {
   activeTouchId = null;
 }
 
+// --- PENGAMAN TAMBAHAN: Reset semua input (joystick & keyboard) ---
+function resetAllInputs() {
+  resetJoystick();
+  keys.up = false;
+  keys.down = false;
+  keys.left = false;
+  keys.right = false;
+}
+
 joystickBase.addEventListener('touchstart', (e) => {
   if (e.cancelable) e.preventDefault();
   unlockAudio();
@@ -98,6 +107,22 @@ window.addEventListener('touchend', (e) => {
   for (const t of e.changedTouches) {
     if (t.identifier === activeTouchId) resetJoystick();
   }
+  // Pengaman 1: Jika sudah tidak ada jari yang menempel di layar, paksa reset!
+  if (e.touches.length === 0) resetJoystick();
+});
+
+// --- PENGAMAN 2: Sentuhan terputus oleh sistem (telepon masuk, pop-up, geser keluar browser) ---
+window.addEventListener('touchcancel', (e) => {
+  for (const t of e.changedTouches) {
+    if (t.identifier === activeTouchId) resetJoystick();
+  }
+  if (e.touches.length === 0) resetJoystick();
+});
+
+// --- PENGAMAN 3: Kehilangan fokus layar (ganti tab, buka panel notifikasi HP) ---
+window.addEventListener('blur', resetAllInputs);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) resetAllInputs();
 });
 
 // Klik untuk unlock audio (aturan autoplay browser)

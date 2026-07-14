@@ -12,8 +12,8 @@ export class Projectile {
     this.dirX = dirX;
     this.dirY = dirY;
     
-    // Kecepatan awal: jika dari musuh (isEnemy) langsung rem ke angka 60!
-    this.speed = isEnemy ? 60 : 360; 
+    // Kecepatan awal: musuh sedang (200), player cepat (360)
+    this.speed = isEnemy ? 200 : 360; 
     
     this.vx = dirX * this.speed;
     this.vy = dirY * this.speed;
@@ -28,8 +28,12 @@ export class Projectile {
   }
 
   update(dt) {
+    // --- KECEPATAN LASER SEIMBANG (MEDIUM SPEED) ---
+    // Awalmu: 520 (terlalu cepat)
+    // Barusan: 60 (terlalu lambat)
+    // Sekarang: 260 (PAS & SEIMBANG!)
     if (this.isLaser && !this._laserSpeedApplied) {
-      this.speed = 60; 
+      this.speed = 260; // <-- DISET KE 260 PX/DETIK!
       this.vx = this.dirX * this.speed;
       this.vy = this.dirY * this.speed;
       this.r = 5;
