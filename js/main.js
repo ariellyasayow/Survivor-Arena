@@ -4,16 +4,38 @@ import { preloadSprites } from './utils/assets.js';
 import { setMaxParticles } from './effects/vfx.js';
 import { setRenderQuality } from './quality.js';
 import { resizeViewport } from './viewport.js';
-import {
-  QUALITY_DROP_FRAMES, MAX_PARTICLES_HIGH, MAX_PARTICLES_LOW,
-} from './config.js';
-import { initFpsMeter, tickFpsMeter } from './debug/fpsMeter.js';
+import { MAX_PARTICLES_HIGH, MAX_PARTICLES_LOW } from './config.js';
 import { initTutorial, notifyInput, isBlockingGameplay, reposition as repositionTutorial } from './tutorial.js';
 
-// Tampilkan FPS meter di pojok layar (buat tes performa langsung di HP tanpa
-// kabel/DevTools). Tambahkan ?fps=0 di URL untuk menyembunyikannya.
-if (new URLSearchParams(location.search).get('fps') !== '0') {
-  initFpsMeter();
+// ---- Deteksi kualitas render (SEKALI di awal, bukan pantau FPS) -----------
+// Sebelumnya sistem ini memantau FPS tiap frame selama main dan menurunkan
+// kualitas secara dinamis kalau lag berkepanjangan. Sekarang disederhanakan:
+// kualitas ditentukan SEKALI di sini berdasarkan kemampuan device (jumlah
+// core CPU, RAM kalau browser mendukung `navigator.deviceMemory`), lalu
+// tetap sama sepanjang sesi bermain — lebih sederhana & hasilnya konsisten.
+//
+// Testing manual: tambahkan ?quality=low / ?quality=medium / ?quality=high
+// di URL untuk memaksa level tertentu tanpa tergantung device asli.
+function detectDeviceQuality() {
+  const forced = new URLSearchParams(location.search).get('quality');
+  if (forced === 'low' || forced === 'medium' || forced === 'high') {
+    return forced;
+  }
+
+  const cpuCores = navigator.hardwareConcurrency || 4; // fallback aman kalau API tidak didukung
+  const ramGB = navigator.deviceMemory; // hanya didukung Chrome/Edge; undefined di browser lain
+
+  if (cpuCores <= 2 || (ramGB !== undefined && ramGB <= 2)) return 'low';
+  if (cpuCores <= 4 || (ramGB !== undefined && ramGB <= 4)) return 'medium';
+  return 'high';
+}
+
+const deviceQuality = detectDeviceQuality();
+setRenderQuality(deviceQuality);
+if (deviceQuality === 'medium') {
+  setMaxParticles(Math.round((MAX_PARTICLES_HIGH + MAX_PARTICLES_LOW) / 2));
+} else if (deviceQuality === 'low') {
+  setMaxParticles(MAX_PARTICLES_LOW);
 }
 
 const canvas = document.getElementById('game-canvas');
@@ -151,33 +173,6 @@ function currentInputVector() {
   return { x, y };
 }
 
-// ---- Adaptive quality ------------------------------------------------------
-// Turunkan kualitas (cap partikel) kalau FPS jatuh berkepanjangan.
-// Catatan: dt di game ini dalam DETIK, jadi threshold low-FPS = 1/24 s.
-const LOW_FPS_DT = 1 / 24; // ~0.0417 s per frame ≈ 24 FPS
-let qualityLevel = 'high'; // 'high' | 'medium' | 'low'
-let lowFpsCount = 0;
-
-function checkPerformance(dt) {
-  if (dt > LOW_FPS_DT) {
-    lowFpsCount++;
-  } else {
-    lowFpsCount = Math.max(0, lowFpsCount - 2); // pulih lebih cepat dari turun
-  }
-
-  if (lowFpsCount > QUALITY_DROP_FRAMES && qualityLevel === 'high') {
-    qualityLevel = 'medium';
-    setRenderQuality('medium');
-    setMaxParticles(Math.round((MAX_PARTICLES_HIGH + MAX_PARTICLES_LOW) / 2));
-    lowFpsCount = 0;
-  } else if (lowFpsCount > QUALITY_DROP_FRAMES && qualityLevel === 'medium') {
-    qualityLevel = 'low';
-    setRenderQuality('low');
-    setMaxParticles(MAX_PARTICLES_LOW);
-    lowFpsCount = 0;
-  }
-}
-
 // ---- Game loop -------------------------------------------------------------
 let lastTime = -1;
 
@@ -192,9 +187,6 @@ function loop(now) {
 
   const dt = Math.min(0.05, (now - lastTime) / 1000); // clamp anti spiral
   lastTime = now;
-
-  tickFpsMeter(now);
-  checkPerformance(dt);
 
   const input = currentInputVector();
   notifyInput(input.x, input.y);

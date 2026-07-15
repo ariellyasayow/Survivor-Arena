@@ -22,7 +22,7 @@ import { isLowQuality } from './quality.js';
 export const CONFIG = {
   STAGE_COUNT: 3,
   STAGE_TARGET: [15, 22, 30],
-  STAGE_TIME: [45, 40, 40],
+  STAGE_TIME: [90, 120, 150], // Lvl 1: 1:30, +30 detik tiap naik level
   BASE_ENEMY_HP: 18,
   BASE_ENEMY_DAMAGE: 1,
   ENEMY_HP_GROWTH_PER_STAGE: 1.35,
@@ -34,6 +34,12 @@ export const CONFIG = {
   MAX_ENEMY3: 3,
   POINT_SPAWN_INTERVAL: 2.2,
   POWERUP_SPAWN_INTERVAL: 9,
+  // --- Shotgun power-up (orb merah) ---
+  SHOTGUN_PELLETS: 5,          // jumlah peluru per tembakan
+  SHOTGUN_SPREAD: 0.7,         // total sudut sebaran (radian, ~40 derajat)
+  SHOTGUN_RANGE_MULT: 0.56,    // jarak lebih pendek dari peluru biasa (160 -> ~90)
+  SHOTGUN_DAMAGE_MULT: 0.6,    // damage per pelet (burst kuat kalau semua kena jarak dekat)
+  SHOTGUN_FIRE_RATE: 0.6,      // jeda antar tembakan shotgun (sedikit lebih lambat)
   MAX_LIVES: 5,
   START_LIVES: 3,
   XP_TO_LEVEL_BASE: 100, // <--- MODIFIKASI XP: DIUBAH MENJADI 100[cite: 2]
@@ -172,8 +178,8 @@ export class Game {
 
   tryShoot() {
     if (this.player.fireCooldown > 0) return;
-    if (this.player.isReloading(this.elapsedTime)) return;
 
+    // Auto-aim ke musuh terdekat (berlaku untuk peluru normal maupun shotgun).
     let nearest = null;
     let nearestDist = Infinity;
     for (const e of this.allEnemies()) {
@@ -186,13 +192,32 @@ export class Game {
     }
     if (!nearest) return;
 
-    const range = this.player.currentBulletRange(this.elapsedTime);
+    const hasShotgun = this.player.hasShotgun();
+    // Shotgun: jangkauan lebih pendek dari peluru biasa.
+    const range = hasShotgun
+      ? this.player.currentBulletRange(this.elapsedTime) * CONFIG.SHOTGUN_RANGE_MULT
+      : this.player.currentBulletRange(this.elapsedTime);
     if (nearestDist > range) return;
 
     const dx = (nearest.x - this.player.x) / nearestDist;
     const dy = (nearest.y - this.player.y) / nearestDist;
-    spawnProjectile(this.player.x, this.player.y, dx, dy, range, this.player.damage);
-    this.player.fireCooldown = this.player.baseFireRate;
+
+    if (hasShotgun) {
+      // Tembak menyebar (spread) ke ARAH MUSUH terdekat.
+      const baseAngle = Math.atan2(dy, dx);
+      const dmg = Math.max(1, Math.round(this.player.damage * CONFIG.SHOTGUN_DAMAGE_MULT));
+      const n = CONFIG.SHOTGUN_PELLETS;
+      for (let i = 0; i < n; i++) {
+        const t = n === 1 ? 0 : (i / (n - 1)) - 0.5; // sebar merata -0.5..0.5
+        const a = baseAngle + t * CONFIG.SHOTGUN_SPREAD;
+        spawnProjectile(this.player.x, this.player.y, Math.cos(a), Math.sin(a), range, dmg);
+      }
+      this.player.fireCooldown = CONFIG.SHOTGUN_FIRE_RATE;
+    } else {
+      spawnProjectile(this.player.x, this.player.y, dx, dy, range, this.player.damage);
+      this.player.fireCooldown = this.player.baseFireRate;
+    }
+
     this.player.notifyShot(this.elapsedTime);
     sfxShoot();
   }
@@ -339,6 +364,7 @@ export class Game {
         if (pu.type === 'life') text = '+1 Nyawa!';
         if (pu.type === 'damage') text = 'Peluru Sakit!';
         if (pu.type === 'speed') text = 'Lari Cepat!';
+        if (pu.type === 'shotgun') text = 'Shotgun!';
 
         spawnFloatingText(pu.x, pu.y - 20, text, '#FFC857');
         sfxPowerUp();
@@ -580,6 +606,8 @@ export class Game {
       ctx.fill();
     }
 
+    // Power-up seragam di minimap: lingkaran berwarna ukuran sama, dibedakan
+    // hanya oleh warna tipenya — KECUALI 'life' yang tetap simbol hati.
     for (const pu of this.powerUps) {
       if (pu.collected) continue;
       const meta = POWERUP_META[pu.type];
@@ -597,10 +625,10 @@ export class Game {
 
       ctx.fillStyle = meta ? meta.color : '#2DE1C7';
       ctx.beginPath();
-      ctx.arc(px, py, 2.2, 0, Math.PI * 2);
+      ctx.arc(px, py, 2.6, 0, Math.PI * 2);
       ctx.fill();
       ctx.strokeStyle = 'rgba(255,255,255,0.8)';
-      ctx.lineWidth = 0.6;
+      ctx.lineWidth = 0.7;
       ctx.stroke();
     }
 

@@ -1,9 +1,6 @@
 import { POWERUP_META } from '../effects/powerup-effects.js';
 import { drawSprite, frameForClip, spriteReady } from '../utils/assets.js';
 
-// Font di-cache sebagai konstanta (hindari re-parse string tiap frame).
-const F_FALLBACK = 'bold 10px sans-serif';
-
 export class PowerUpItem {
   constructor(x, y, type) {
     this.x = x;
@@ -15,30 +12,54 @@ export class PowerUpItem {
 
   draw(ctx, elapsedTime) {
     const meta = POWERUP_META[this.type];
+    const color = meta ? meta.color : '#2DE1C7';
     const bob = Math.sin(elapsedTime * 3 + this.x) * 3;
     const y = this.y + bob;
 
-    // 'life' pakai sprite hati; tipe lain pakai orb berputar.
-    const spriteKey = this.type === 'life' ? 'heart' : 'orb';
-    const frame = frameForClip(spriteKey, elapsedTime, 10, 'loop').index;
-    if (spriteReady(spriteKey) && drawSprite(ctx, spriteKey, this.x, y, this.r * 2.6, frame)) {
+    // 'life' tetap pakai sprite HATI (dikecualikan dari orb seragam).
+    if (this.type === 'life') {
+      const frame = frameForClip('heart', elapsedTime, 10, 'loop').index;
+      if (spriteReady('heart') && drawSprite(ctx, 'heart', this.x, y, this.r * 2.6, frame)) {
+        return;
+      }
+      // Fallback kalau sprite belum ada: hati merah primitif.
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(this.x, y, this.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
       return;
     }
 
-    // Fallback primitif (dipakai selama sprite belum ada di assets/spritesheets/).
-    ctx.fillStyle = meta.color;
-    ctx.beginPath();
-    ctx.arc(this.x, y, this.r, 0, Math.PI * 2);
-    ctx.fill();
+    // Semua power-up lain SERAGAM: orb mengilap dengan bentuk & ukuran sama,
+    // dibedakan hanya oleh warna sesuai tipenya (POWERUP_META).
+    const pulse = 1 + Math.sin(elapsedTime * 5 + this.x) * 0.08;
+    const rr = this.r * pulse;
 
+    // Aura lembut
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(this.x, y, rr * 1.7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Badan orb
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(this.x, y, rr, 0, Math.PI * 2);
+    ctx.fill();
     ctx.strokeStyle = 'rgba(255,255,255,0.7)';
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    ctx.fillStyle = '#0B0F2B';
-    ctx.font = F_FALLBACK;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('!', this.x, y);
+    // Kilau putih kecil
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.beginPath();
+    ctx.arc(this.x - rr * 0.32, y - rr * 0.32, rr * 0.28, 0, Math.PI * 2);
+    ctx.fill();
   }
 }

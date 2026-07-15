@@ -23,9 +23,5 @@ export const PARTICLE_POOL_SIZE = 80;
 // ── Projectile pool ─────────────────────────
 export const PROJECTILE_POOL_SIZE = 80;
 
-// ── Adaptive quality ────────────────────────
-export const LOW_FPS_THRESHOLD = 2.5;
-export const QUALITY_DROP_FRAMES = 90;
-
 // ── Audio ───────────────────────────────────
 export const AUDIO_THROTTLE_MS = 45;

@@ -2,9 +2,6 @@ import { clamp } from '../utils/helpers.js';
 import { WORLD_W, WORLD_H, OBSTACLES } from '../world/background.js';
 import { drawSprite, frameForClip, spriteReady } from '../utils/assets.js';
 
-export const MAG_SIZE = 50;      // peluru per magazine
-export const RELOAD_TIME = 3;    // detik cooldown reload setelah magazine habis
-
 export class Player {
   constructor() {
     this.x = WORLD_W / 2;
@@ -20,12 +17,9 @@ export class Player {
     this.fireCooldown = 0;
     this.damageBuffUntil = 0;
     this.speedBuffUntil = 0;
+    this.shotgunUnlocked = false; // permanen sekali dapat power-up shotgun
 
     this.invulnerableUntil = 0;
-
-    // --- Amunisi: infinite, tapi tiap 50 peluru harus reload 3 detik ---
-    this.ammo = MAG_SIZE;
-    this.reloadUntil = 0; // elapsedTime sampai kapan sedang reload
 
     // --- State animasi ---
     this.facingDir = -1;     // -1 = hadap kiri (West, default sprite), +1 = kanan
@@ -41,18 +35,10 @@ export class Player {
     return this.baseDamage + (this.powerLevel || 0) * 2;
   }
 
-  isReloading(elapsedTime) {
-    return elapsedTime < this.reloadUntil;
-  }
-
-  // Dipanggil game.js tiap kali player berhasil menembak 1 peluru.
+  // Dipanggil game.js tiap kali player berhasil menembak — amunisi infinite,
+  // tidak ada magazine/reload lagi.
   notifyShot(elapsedTime) {
-    this.ammo -= 1;
     this.firingUntil = elapsedTime + 0.35; // durasi tampil animasi firing
-    if (this.ammo <= 0) {
-      this.ammo = MAG_SIZE;
-      this.reloadUntil = elapsedTime + RELOAD_TIME;
-    }
   }
 
   isInvulnerable(elapsedTime) {
@@ -122,6 +108,10 @@ export class Player {
 
   currentBulletRange(elapsedTime) {
     return this.baseRange;
+  }
+
+  hasShotgun() {
+    return this.shotgunUnlocked;
   }
 
   // Pilih klip animasi aktif berdasarkan state. Mengembalikan nama sprite key.

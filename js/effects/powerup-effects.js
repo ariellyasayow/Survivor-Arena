@@ -1,9 +1,10 @@
-export const POWERUP_TYPES = ['life', 'damage', 'speed'];
+export const POWERUP_TYPES = ['life', 'damage', 'speed', 'shotgun'];
 
 export const POWERUP_META = {
   life: { color: '#FF5470', label: '+Nyawa' },
   damage: { color: '#FF6F59', label: 'Damage+' },
   speed: { color: '#FFC857', label: 'Cepat!' },
+  shotgun: { color: '#FF2A2A', label: 'Shotgun!' },
 };
 
 const DAMAGE_BUFF_SECONDS = 8;
@@ -26,6 +27,12 @@ export function applyPowerUp(type, player, game) {
       player.baseSpeed += 40;
       player.speedBuffUntil = game.elapsedTime + SPEED_BUFF_SECONDS;
       setTimeout(() => { player.baseSpeed -= 40; }, SPEED_BUFF_SECONDS * 1000);
+      break;
+    case 'shotgun':
+      // Mode shotgun PERMANEN: sekali dapat, player menembak menyebar
+      // (spread) ke musuh terdekat dengan jarak lebih pendek — lihat
+      // tryShoot di game.js. Tidak ada timer, berlaku sampai game berakhir.
+      player.shotgunUnlocked = true;
       break;
   }
 }
