@@ -10,9 +10,12 @@ const xpFillEl = document.getElementById('xp-bar-fill');
 const buffListEl = document.getElementById('buff-list');
 
 // Definisi buff yang punya durasi & perlu ditampilkan di HUD.
+// --- MODIFIKASI: DIDAFTARKAN SHOTGUN (10s) DAN RAPID FIRE/MESIN (5s) ---
 const TRACKED_BUFFS = [
   { key: 'damageBuffUntil', type: 'damage', icon: '\u2694\ufe0f', duration: 8 },
   { key: 'speedBuffUntil', type: 'speed', icon: '\u26a1', duration: 6 },
+  { key: 'shotgunBuffUntil', type: 'shotgun', icon: '\ud83d\udca5', duration: 10 }, // <--- TAMBAHAN: IKON SHOTGUN
+  { key: 'rapidBuffUntil', type: 'rapid', icon: '\ud83d\udd25', duration: 5 },       // <--- TAMBAHAN: IKON MESIN
 ];
 
 // Cache elemen badge per tipe buff supaya tidak rebuild DOM tiap frame.

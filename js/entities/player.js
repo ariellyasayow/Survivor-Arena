@@ -17,7 +17,10 @@ export class Player {
     this.fireCooldown = 0;
     this.damageBuffUntil = 0;
     this.speedBuffUntil = 0;
-    this.shotgunUnlocked = false; // permanen sekali dapat power-up shotgun
+    // --- MODIFIKASI: TIMER POWER-UP SHOTGUN & RAPID FIRE ---
+    this.shotgunBuffUntil = 0;    // <--- DIUBAH JADI TIMER (BUKAN PERMANEN LAGI)
+    this.rapidBuffUntil = 0;      // <--- DITAMBAHKAN: TIMER RAPID FIRE / MESIN (OPSI 3)
+    this.currentElapsedTime = 0;
 
     this.invulnerableUntil = 0;
 
@@ -32,7 +35,12 @@ export class Player {
 
   get damage() {
     // Naik level (xp) menambah damage, sesuai "XP (tambah damage)" di Game UI.
-    return this.baseDamage + (this.powerLevel || 0) * 2;
+    let currentDamage = this.baseDamage + (this.powerLevel || 0) * 2;
+    // --- MODIFIKASI OPSI 3: KURANGI SEDIKIT DAMAGE AGAR RAPID FIRE SEIMBANG ---
+    if (this.hasRapidFire(this.currentElapsedTime)) {
+      currentDamage = Math.max(1, Math.round(currentDamage * 0.7)); // Damage turun 30%
+    }
+    return currentDamage;
   }
 
   // Dipanggil game.js tiap kali player berhasil menembak — amunisi infinite,
@@ -56,7 +64,13 @@ export class Player {
     }
   }
 
+  // --- MODIFIKASI OPSI 3: METHOD PENGECEKAN STATUS RAPID FIRE ---
+  hasRapidFire(elapsedTime) {
+    return elapsedTime < this.rapidBuffUntil;
+  }
+
   update(dt, input, elapsedTime) {
+    this.currentElapsedTime = elapsedTime; // Simpan untuk referensi getter damage
     if (this.dead) {
       this.deathTime += dt;
       return;
@@ -110,8 +124,9 @@ export class Player {
     return this.baseRange;
   }
 
-  hasShotgun() {
-    return this.shotgunUnlocked;
+  // --- MODIFIKASI: SEKARANG MENGECEK DURASI WAKTU (BUKAN PERMANEN LAGI) ---
+  hasShotgun(elapsedTime) {
+    return elapsedTime < this.shotgunBuffUntil;
   }
 
   // Pilih klip animasi aktif berdasarkan state. Mengembalikan nama sprite key.

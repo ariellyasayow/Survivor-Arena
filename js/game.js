@@ -42,7 +42,7 @@ export const CONFIG = {
   SHOTGUN_FIRE_RATE: 0.6,      // jeda antar tembakan shotgun (sedikit lebih lambat)
   MAX_LIVES: 5,
   START_LIVES: 3,
-  XP_TO_LEVEL_BASE: 100, // <--- MODIFIKASI XP: DIUBAH MENJADI 100[cite: 2]
+  XP_TO_LEVEL_BASE: 100, // <--- MODIFIKASI XP: DIUBAH MENJADI 100
   NIGHT_VISION_RADIUS: 140,
 };
 
@@ -192,7 +192,10 @@ export class Game {
     }
     if (!nearest) return;
 
-    const hasShotgun = this.player.hasShotgun();
+    // --- MODIFIKASI: CEK STATUS SHOTGUN (DENGAN WAKTU) & RAPID FIRE ---
+    const hasShotgun = this.player.hasShotgun(this.elapsedTime);
+    const isRapid = this.player.hasRapidFire(this.elapsedTime); // <--- OPSI 3
+
     // Shotgun: jangkauan lebih pendek dari peluru biasa.
     const range = hasShotgun
       ? this.player.currentBulletRange(this.elapsedTime) * CONFIG.SHOTGUN_RANGE_MULT
@@ -212,10 +215,12 @@ export class Game {
         const a = baseAngle + t * CONFIG.SHOTGUN_SPREAD;
         spawnProjectile(this.player.x, this.player.y, Math.cos(a), Math.sin(a), range, dmg);
       }
-      this.player.fireCooldown = CONFIG.SHOTGUN_FIRE_RATE;
+      // --- MODIFIKASI: KALAU PUNYA SHOTGUN + RAPID FIRE = BURST GUN! ---
+      this.player.fireCooldown = isRapid ? 0.2 : CONFIG.SHOTGUN_FIRE_RATE;
     } else {
       spawnProjectile(this.player.x, this.player.y, dx, dy, range, this.player.damage);
-      this.player.fireCooldown = this.player.baseFireRate;
+      // --- MODIFIKASI: KALAU RAPID FIRE NORMAL = SENAPAN MESIN (0.15s)! ---
+      this.player.fireCooldown = isRapid ? 0.15 : this.player.baseFireRate;
     }
 
     this.player.notifyShot(this.elapsedTime);
@@ -365,6 +370,7 @@ export class Game {
         if (pu.type === 'damage') text = 'Peluru Sakit!';
         if (pu.type === 'speed') text = 'Lari Cepat!';
         if (pu.type === 'shotgun') text = 'Shotgun!';
+        if (pu.type === 'rapid') text = 'Mesin!'; // <--- MODIFIKASI: TEKS RAPID FIRE
 
         spawnFloatingText(pu.x, pu.y - 20, text, '#FFC857');
         sfxPowerUp();
@@ -424,7 +430,7 @@ export class Game {
   onPointCollected(pt) {
     this.score += 10 * pt.value;
     this.stageScore += pt.value;
-    // <--- MODIFIKASI XP: HAPUS PENAMBAHAN XP DARI KOIN[cite: 2]
+    // <--- MODIFIKASI XP: HAPUS PENAMBAHAN XP DARI KOIN
     spawnFloatingText(pt.x, pt.y, '+10', '#FFC857');
     sfxPoint();
     this.checkPowerLevelUp();
@@ -432,7 +438,7 @@ export class Game {
 
   onEnemyKilled(enemy) {
     this.score += 15;
-    this.xp += 12; // <--- MODIFIKASI XP: XP MURNI DARI BUNUH MUSUH[cite: 2]
+    this.xp += 12; // <--- MODIFIKASI XP: XP MURNI DARI BUNUH MUSUH
     spawnFloatingText(enemy.x, enemy.y - 10, '+15', '#FF6F59');
     this.checkPowerLevelUp();
   }
@@ -442,7 +448,7 @@ export class Game {
       this.xp -= this.xpToNextLevel;
       this.powerLevel += 1;
       this.player.powerLevel = this.powerLevel;
-      // <--- MODIFIKASI XP: KURVA LEVEL UP MENJADI * 2.0x[cite: 2]
+      // <--- MODIFIKASI XP: KURVA LEVEL UP MENJADI * 2.0x
       this.xpToNextLevel = Math.round(this.xpToNextLevel * 2.0);
       
       spawnLevelUpBurst(this.player.x, this.player.y);

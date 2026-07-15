@@ -1,14 +1,18 @@
-export const POWERUP_TYPES = ['life', 'damage', 'speed', 'shotgun'];
+// --- DITAMBAHKAN TIPE BARU 'rapid' ---
+export const POWERUP_TYPES = ['life', 'damage', 'speed', 'shotgun', 'rapid'];
 
 export const POWERUP_META = {
   life: { color: '#FF5470', label: '+Nyawa' },
   damage: { color: '#FF6F59', label: 'Damage+' },
   speed: { color: '#FFC857', label: 'Cepat!' },
   shotgun: { color: '#FF2A2A', label: 'Shotgun!' },
+  rapid: { color: '#FF8C00', label: 'Mesin!' }, // <--- WARNA ORANYE MENYALA
 };
 
 const DAMAGE_BUFF_SECONDS = 8;
 const SPEED_BUFF_SECONDS = 6;
+const SHOTGUN_BUFF_SECONDS = 10; // <--- MODIFIKASI: DURASI SHOTGUN 10 DETIK
+const RAPID_BUFF_SECONDS = 5;    // <--- MODIFIKASI: DURASI RAPID FIRE 5 DETIK
 
 export function applyPowerUp(type, player, game) {
   switch (type) {
@@ -29,10 +33,12 @@ export function applyPowerUp(type, player, game) {
       setTimeout(() => { player.baseSpeed -= 40; }, SPEED_BUFF_SECONDS * 1000);
       break;
     case 'shotgun':
-      // Mode shotgun PERMANEN: sekali dapat, player menembak menyebar
-      // (spread) ke musuh terdekat dengan jarak lebih pendek — lihat
-      // tryShoot di game.js. Tidak ada timer, berlaku sampai game berakhir.
-      player.shotgunUnlocked = true;
+      // --- MODIFIKASI: DIUBAH DARI PERMANEN MENJADI TIMER 10 DETIK ---
+      player.shotgunBuffUntil = game.elapsedTime + SHOTGUN_BUFF_SECONDS;
+      break;
+    case 'rapid':
+      // --- MODIFIKASI: AKTIFKAN MODE SENAPAN MESIN SELAMA 5 DETIK ---
+      player.rapidBuffUntil = game.elapsedTime + RAPID_BUFF_SECONDS;
       break;
   }
 }
