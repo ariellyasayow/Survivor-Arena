@@ -1,15 +1,15 @@
-// SFX di-generate langsung lewat Web Audio API, jadi tidak butuh file .mp3/.wav
-// dulu. Nanti kalau tim sudah punya aset suara asli, tinggal ganti isi tiap
-// fungsi ini dengan `new Audio('assets/sounds/xxx.mp3').play()`.
-//
-// Dioptimasi mengikuti acuan drop_n_dash/src/audio.js: tiap SFX di-throttle
-// supaya tidak spam oscillator saat dipanggil beruntun (mis. sfxShoot yang
-// terpicu tiap peluru saat magazine 50 butir).
+// =============================================
+//  sfx.js — Efek suara game
+// =============================================
+// Semua suara di sini dibuat langsung oleh kode (bukan dari file .mp3/.wav),
+// jadi ukuran game tetap kecil. Tiap suara pada dasarnya adalah nada singkat
+// atau derau yang dibentuk supaya terdengar seperti tembakan atau ledakan.
 
 import { AUDIO_THROTTLE_MS } from '../config.js';
 
 let ctx = null;
 
+/** Siapkan mesin suara (dibuat sekali, lalu dipakai terus). */
 function ensureContext() {
   if (!ctx) {
     ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -20,11 +20,19 @@ function ensureContext() {
   return ctx;
 }
 
-// Panggil ini sekali dari event klik/tap pertama pengguna (aturan browser).
+/**
+ * Nyalakan suara. Browser melarang suara berbunyi sebelum pengguna menyentuh
+ * layar, jadi ini dipanggil saat sentuhan/klik pertama.
+ */
 export function unlockAudio() {
   ensureContext();
 }
 
+/**
+ * Bunyikan satu nada singkat yang volumenya memudar sampai hilang.
+ * freq = tinggi-rendah nada, duration = panjang bunyi, type = jenis bunyi,
+ * volume = kencangnya, delay = jeda sebelum berbunyi.
+ */
 function tone(freq, duration, type = 'sine', volume = 0.2, delay = 0) {
   const audio = ensureContext();
   const osc = audio.createOscillator();
@@ -41,8 +49,10 @@ function tone(freq, duration, type = 'sine', volume = 0.2, delay = 0) {
   osc.stop(startTime + duration + 0.02);
 }
 
-// Oscillator dengan frequency SWEEP (naik/turun) — dipakai untuk laser, dsb.
-// freqFrom -> freqTo secara eksponensial sepanjang duration.
+/**
+ * Nada yang tinggi-rendahnya meluncur dari freqFrom ke freqTo — cocok buat
+ * bunyi laser atau sabetan.
+ */
 function sweep(freqFrom, freqTo, duration, type = 'sawtooth', volume = 0.2, delay = 0) {
   const audio = ensureContext();
   const osc = audio.createOscillator();
@@ -60,8 +70,10 @@ function sweep(freqFrom, freqTo, duration, type = 'sawtooth', volume = 0.2, dela
   osc.stop(startTime + duration + 0.02);
 }
 
-// Burst noise (derau) dilewatkan filter — dipakai untuk ledakan, dsb.
-// Noise dibuat lewat buffer acak (bukan oscillator), lebih mirip suara "boom".
+/**
+ * Suara "desis/gemuruh" acak yang meredup — dipakai buat efek ledakan supaya
+ * terdengar lebih nyata daripada sekadar nada.
+ */
 function noiseBurst(duration, { volume = 0.3, filterFreq = 800, filterFreqEnd = 80, delay = 0 } = {}) {
   const audio = ensureContext();
   const startTime = audio.currentTime + delay;
@@ -92,8 +104,13 @@ function noiseBurst(duration, { volume = 0.3, filterFreq = 800, filterFreqEnd = 
   noise.stop(startTime + duration + 0.02);
 }
 
-// Throttle: cegah SFX yang sama dipanggil terlalu rapat (spam oscillator).
+// Catatan kapan tiap suara terakhir dibunyikan.
 const _lastPlay = {};
+
+/**
+ * Bungkus sebuah suara supaya tidak bisa berbunyi terlalu sering beruntun
+ * (biar tidak berisik saat, misalnya, menembak sangat cepat).
+ */
 function throttled(name, fn) {
   return () => {
     const now = performance.now();

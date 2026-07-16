@@ -1,16 +1,22 @@
+// =============================================
+//  enemy2.js — Musuh 2: peledak nekat (kamikaze)
+// =============================================
+// Musuh cepat yang mengejar player, dan begitu dekat ia berhenti sebentar
+// (ancang-ancang) lalu MELEDAK. Ledakannya melukai player yang ada di dekatnya.
+// Darahnya lebih sedikit, larinya dua kali lebih cepat dari musuh 1.
+//
+// Fungsi dasar yang sama dengan musuh 1 (mengurangi darah, menandai kalah,
+// memulai animasi mati) dijelaskan di enemy.js — di sini fokus ke ledakannya.
 import { drawSprite, frameForClip, spriteReady } from '../utils/assets.js';
 
 let enemyIdCounter = 0;
 
-const ATTACK_TRIGGER_DIST = 42; // jarak enemy2 mulai windup ledakan
-const WINDUP_TIME = 0.5;        // detik animasi sebelum benar-benar meledak
-const EXPLODE_RADIUS = 46;      // radius ledakan yang melukai player
+const ATTACK_TRIGGER_DIST = 42; // sedekat apa baru mulai ancang-ancang meledak
+const WINDUP_TIME = 0.5;        // lama ancang-ancang sebelum meledak (detik)
+const EXPLODE_RADIUS = 46;      // seberapa luas ledakan melukai player
 
-// Enemy2: fast kamikaze dengan serangan ledakan
-// - HP 25% lebih rendah dari enemy1
-// - Speed 2x dari enemy1
-// - Siklus: run -> windup (attacking) -> MELEDAK sekali -> death
 export class Enemy2 {
+  // Sama seperti musuh 1; kecepatannya digandakan di dalam.
   constructor(x, y, hp, damage, speed) {
     this.id = enemyIdCounter++;
     this.x = x;
@@ -37,6 +43,7 @@ export class Enemy2 {
     this.explosionJustTriggered = false; // one-shot: baru saja mulai meledak
   }
 
+  /** Tiap frame: kejar player, ancang-ancang saat dekat, lalu meledak. */
   update(dt, target, elapsedTime, obstacles) {
     if (this.dying) {
       this.deathTime += dt;
@@ -61,7 +68,7 @@ export class Enemy2 {
       return;
     }
 
-    // Mulai windup kalau cukup dekat.
+    // Mulai ancang-ancang saat sudah cukup dekat.
     if (distToPlayer < ATTACK_TRIGGER_DIST) {
       this.attacking = true;
       this.attackTime = 0;
@@ -94,23 +101,25 @@ export class Enemy2 {
     this.y = nextY;
   }
 
+  /** Seperti musuh 1; tidak mempan saat sudah ancang-ancang meledak. */
   takeDamage(amount, elapsedTime) {
-    // Saat sudah windup ledakan, tidak bisa dibatalkan (tetap meledak).
     if (this.dying || this.attacking) return;
     this.hp -= amount;
     this.hitFlashUntil = elapsedTime + 0.08;
     if (this.hp <= 0) this.hp = 0;
   }
 
+  /** Menandakan darah sudah habis. */
   get defeated() {
     return this.hp <= 0;
   }
 
-  // Enemy2 tidak bisa ditembak saat windup ledakan (immune) atau sedang mati.
+  /** Tidak bisa ditembak saat sedang ancang-ancang meledak atau sudah mati. */
   get isTargetable() {
     return !this.dying && !this.attacking;
   }
 
+  /** Mulai mati sekaligus MELEDAK (entah karena ancang-ancang selesai atau kena tembak). */
   startDeath() {
     if (!this.dying) {
       this.dying = true;
@@ -125,21 +134,24 @@ export class Enemy2 {
     }
   }
 
-  // Dipanggil game.js sekali untuk ambil & consume flag "baru saja meledak".
+  /**
+   * Kasih tahu game "aku baru saja meledak" tepat sekali, supaya suara & efek
+   * ledakan cuma dipicu satu kali.
+   */
   consumeExplosionTrigger() {
     if (!this.explosionJustTriggered) return false;
     this.explosionJustTriggered = false;
     return true;
   }
 
+  /** Sudah boleh dihapus (animasi matinya selesai). */
   isGone() {
     if (!this.dying) return false;
     if (!spriteReady('enemy2Attack')) return true;
     return this.deathTime >= 0.9; // 9 frame @ 10fps
   }
 
-  // Dipanggil game.js tiap frame: cek apakah player kena radius ledakan yang
-  // aktif SEPANJANG animasi mati. Hanya melukai sekali per enemy (hasHitPlayer).
+  /** Cek apakah player sedang berada di dalam ledakan (cuma melukai sekali). */
   hitsPlayerNow(player) {
     if (!this.explosionActive || this.hasHitPlayer) return false;
     const dist = Math.hypot(player.x - this.x, player.y - this.y);
@@ -150,6 +162,7 @@ export class Enemy2 {
     return false;
   }
 
+  /** Gambar musuh + lingkaran peringatan ancang-ancang + efek ledakan + bar darah. */
   draw(ctx, elapsedTime) {
     const flashing = elapsedTime < this.hitFlashUntil;
     const mirror = this.facingDir > 0;

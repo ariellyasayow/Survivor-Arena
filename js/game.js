@@ -1,3 +1,9 @@
+// =============================================
+//  game.js — Pusat kendali game
+// =============================================
+// File utama yang mengatur segalanya: pengaturan angka (CONFIG), keadaan
+// permainan, memunculkan musuh & item, tembak-menembak, cek tabrakan, naik
+// level, dan menggambar semuanya. Dipanggil main.js terus-menerus.
 import { Player } from './entities/player.js';
 import { Enemy } from './entities/enemy.js';
 import { Enemy2 } from './entities/enemy2.js';
@@ -19,6 +25,7 @@ import { viewport, camera, updateCamera } from './viewport.js';
 import { VIEWPORT_W, VIEWPORT_H, MINIMAP_W, MINIMAP_H, MINIMAP_MARGIN } from './config.js';
 import { isLowQuality } from './quality.js';
 
+// Semua angka pengaturan game dikumpulkan di sini biar gampang diubah.
 export const CONFIG = {
   STAGE_COUNT: 3,
   STAGE_TARGET: [15, 22, 30],
@@ -38,7 +45,7 @@ export const CONFIG = {
   SHOTGUN_PELLETS: 5,          // jumlah peluru per tembakan
   SHOTGUN_SPREAD: 0.7,         // total sudut sebaran (radian, ~40 derajat)
   SHOTGUN_RANGE_MULT: 0.56,    // jarak lebih pendek dari peluru biasa (160 -> ~90)
-  SHOTGUN_DAMAGE_MULT: 0.6,    // damage per pelet (burst kuat kalau semua kena jarak dekat)
+  SHOTGUN_DAMAGE_MULT: 0.6,    // damage per pelet (total besar saat semua kena di jarak dekat)
   SHOTGUN_FIRE_RATE: 0.6,      // jeda antar tembakan shotgun (sedikit lebih lambat)
   MAX_LIVES: 5,
   START_LIVES: 3,
@@ -53,6 +60,7 @@ const overlayMessageEl = document.getElementById('overlay-message');
 const overlayButtonEl = document.getElementById('overlay-button');
 
 export class Game {
+  /** Siapkan game, atur ulang ke kondisi awal, & pasang tombol "Mulai". */
   constructor(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
@@ -81,6 +89,7 @@ export class Game {
     });
   }
 
+  /** Kembalikan semua ke kondisi awal (saat mulai baru atau main lagi). */
   reset() {
     this.state = 'intro';
     this.deathReason = null;
@@ -124,10 +133,12 @@ export class Game {
     }
   }
 
+  /** Sedang di level terakhir (malam, pandangan terbatas)? */
   get isNight() {
     return this.stageIndex === this.stageCount - 1;
   }
 
+  /** Munculkan musuh 1 dari pinggir; makin tinggi level makin kuat. */
   spawnEnemy() {
     const p = randomEdgePoint(WORLD_W, WORLD_H, 16);
     const hp = CONFIG.BASE_ENEMY_HP * Math.pow(CONFIG.ENEMY_HP_GROWTH_PER_STAGE, this.stageIndex);
@@ -137,6 +148,7 @@ export class Game {
     sfxMonster();
   }
 
+  /** Munculkan musuh 2 (peledak); darahnya lebih sedikit dari musuh 1. */
   spawnEnemy2() {
     const p = randomEdgePoint(WORLD_W, WORLD_H, 16);
     const baseHp = CONFIG.BASE_ENEMY_HP * Math.pow(CONFIG.ENEMY_HP_GROWTH_PER_STAGE, this.stageIndex);
@@ -147,6 +159,7 @@ export class Game {
     sfxMonster();
   }
 
+  /** Munculkan musuh 3 (penembak laser) dari pinggir. */
   spawnEnemy3() {
     const p = randomEdgePoint(WORLD_W, WORLD_H, 16);
     const hp = CONFIG.BASE_ENEMY_HP * Math.pow(CONFIG.ENEMY_HP_GROWTH_PER_STAGE, this.stageIndex);
@@ -156,30 +169,50 @@ export class Game {
     sfxMonster();
   }
 
+  /** Cari tempat acak yang tidak menimpa pohon/batu (coba sampai 20 kali). */
+  randomFreePosition(itemR, margin = 24) {
+    let x = 0;
+    let y = 0;
+    for (let attempt = 0; attempt < 20; attempt++) {
+      x = randRange(margin, WORLD_W - margin);
+      y = randRange(margin, WORLD_H - margin);
+      let overlaps = false;
+      for (const o of OBSTACLES) {
+        // Dianggap menimpa saat titiknya terlalu dekat dengan pohon/batu
+        // (jaraknya lebih kecil dari gabungan ukuran keduanya + sedikit jarak aman).
+        if (Math.hypot(x - o.x, y - o.y) < o.r + itemR + 6) {
+          overlaps = true;
+          break;
+        }
+      }
+      if (!overlaps) break; // sudah dapat tempat kosong
+    }
+    return { x, y };
+  }
+
+  /** Munculkan satu koin di tempat acak yang tidak menimpa pohon/batu. */
   spawnPoint() {
-    const margin = 24;
-    const x = randRange(margin, WORLD_W - margin);
-    const y = randRange(margin, WORLD_H - margin);
+    const { x, y } = this.randomFreePosition(7); // 7 = ukuran koin
     this.points.push(new PointItem(x, y, 1));
   }
 
+  /** Munculkan satu power-up acak di tempat yang tidak menimpa pohon/batu. */
   spawnPowerUp() {
-    const margin = 24;
-    const x = randRange(margin, WORLD_W - margin);
-    const y = randRange(margin, WORLD_H - margin);
-
+    const { x, y } = this.randomFreePosition(9); // 9 = ukuran power-up
     const type = POWERUP_TYPES[randInt(0, POWERUP_TYPES.length - 1)];
     this.powerUps.push(new PowerUpItem(x, y, type));
   }
 
+  /** Semua musuh (jenis 1, 2, dan 3) dijadikan satu daftar. */
   allEnemies() {
     return [...this.enemies, ...this.enemy2s, ...this.enemy3s];
   }
 
+  /** Otomatis bidik musuh terdekat lalu tembak (menyebar saat mode shotgun). */
   tryShoot() {
     if (this.player.fireCooldown > 0) return;
 
-    // Auto-aim ke musuh terdekat (berlaku untuk peluru normal maupun shotgun).
+    // Cari musuh terdekat sebagai sasaran.
     let nearest = null;
     let nearestDist = Infinity;
     for (const e of this.allEnemies()) {
@@ -227,6 +260,7 @@ export class Game {
     sfxShoot();
   }
 
+  /** Perbarui semuanya satu langkah: player, musuh, peluru, item, tabrakan, waktu. */
   update(dt, input) {
     if (this.state === 'dying') {
       this.elapsedTime += dt;
@@ -427,6 +461,7 @@ export class Game {
     updateHUD(this);
   }
 
+  /** Saat koin diambil: tambah skor & poin level, lalu cek apakah naik level. */
   onPointCollected(pt) {
     this.score += 10 * pt.value;
     this.stageScore += pt.value;
@@ -436,6 +471,7 @@ export class Game {
     this.checkPowerLevelUp();
   }
 
+  /** Saat musuh mati: tambah skor & XP, lalu cek apakah naik level. */
   onEnemyKilled(enemy) {
     this.score += 15;
     this.xp += 12; // <--- MODIFIKASI XP: XP MURNI DARI BUNUH MUSUH
@@ -443,6 +479,7 @@ export class Game {
     this.checkPowerLevelUp();
   }
 
+  /** Kalau XP cukup, naik level (dan XP untuk level berikutnya jadi 2x lebih banyak). */
   checkPowerLevelUp() {
     if (this.xp >= this.xpToNextLevel) {
       this.xp -= this.xpToNextLevel;
@@ -457,6 +494,7 @@ export class Game {
     }
   }
 
+  /** Player kena serangan: kurangi nyawa, beri kebal sebentar, cek kalah. */
   onPlayerHit(damage = 1, { instantKill = false } = {}) {
     if (this.player.isInvulnerable(this.elapsedTime)) return;
     this.lives -= instantKill ? this.lives : damage;
@@ -470,6 +508,7 @@ export class Game {
     }
   }
 
+  /** Mulai player mati: putar animasi matinya dulu, atau langsung berakhir. */
   startPlayerDeath() {
     this.player.startDeath();
     sfxGameOver();
@@ -480,6 +519,7 @@ export class Game {
     }
   }
 
+  /** Lanjut ke level berikutnya; menang begitu level terakhir selesai. */
   advanceStage() {
     this.stageIndex += 1;
     if (this.stageIndex >= this.stageCount) {
@@ -499,10 +539,11 @@ export class Game {
     sfxLevelUp();
   }
 
+  /** Akhiri permainan & tampilkan layar hasil (won = menang atau kalah). */
   endGame(won) {
     this.state = 'ended';
     sfxGameOver();
-    
+
     if (overlayTitleEl) {
       overlayTitleEl.textContent = won ? 'Kamu selamat!' : 'Game over';
       const lossReason = this.deathReason === 'timeout'
@@ -516,6 +557,7 @@ export class Game {
     }
   }
 
+  /** Gambar satu tampilan: latar, item, musuh, peluru, player, efek, peta kecil. */
   render() {
     const ctx = this.ctx;
     const { scale, offsetX, offsetY } = viewport;
@@ -557,7 +599,7 @@ export class Game {
     }
   }
 
-  // --- REVISI LAMPU MALAM: MENGGUNAKAN TRIK EVENODD AGAR TIDAK MENGHAPUS GAMBAR ---
+  /** Gelapkan layar kecuali lingkaran di sekitar player, seperti efek senter. */
   drawNightMask(ctx) {
     const radius = this.player.currentVisionRadius(this.elapsedTime, CONFIG.NIGHT_VISION_RADIUS);
     
@@ -587,6 +629,7 @@ export class Game {
     ctx.restore();
   }
 
+  /** Gambar peta kecil: koin, power-up, musuh, area yang terlihat, & posisi player. */
   drawMiniMap(ctx) {
     const mapW = MINIMAP_W;
     const mapH = MINIMAP_H;

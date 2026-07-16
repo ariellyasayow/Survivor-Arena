@@ -1,9 +1,12 @@
 // =============================================
-//  viewport.js — Skala, kamera & letterbox canvas
+//  viewport.js — Ukuran layar & kamera
 // =============================================
+// Mengatur bagaimana dunia game (yang besar) ditampilkan ke layar (yang kecil):
+// menyesuaikan ukuran ke jendela, dan menggeser kamera mengikuti player.
 
 import { WORLD_W, WORLD_H, VIEWPORT_W, VIEWPORT_H, MAX_DPR } from './config.js';
 
+// Info skala & pergeseran gambar biar pas di layar apa pun ukurannya.
 export const viewport = {
   scale: 1,
   offsetX: 0,
@@ -11,16 +14,23 @@ export const viewport = {
   dpr: 1,
 };
 
+// Posisi kamera. speed = seberapa cepat kamera mengejar player
+// (kecil = geraknya halus, 1 = langsung menempel).
 export const camera = {
   x: 0,
   y: 0,
-  speed: 0.08, // Faktor smoothing (0 = diam, 1 = instan)
+  speed: 0.08,
 };
 
+/** Ambil nilai di antara a dan b (buat gerak kamera yang halus). */
 function lerp(a, b, t) {
   return a + (b - a) * t;
 }
 
+/**
+ * Geser kamera pelan-pelan supaya player selalu di tengah layar. Kamera
+ * ditahan agar tidak menampilkan area kosong di luar batas dunia.
+ */
 export function updateCamera(playerX, playerY) {
   // Target kamera agar player tepat berada di tengah layar terlihat
   const targetX = playerX - VIEWPORT_W / 2;
@@ -34,6 +44,10 @@ export function updateCamera(playerX, playerY) {
   camera.y = Math.max(0, Math.min(camera.y, WORLD_H - VIEWPORT_H));
 }
 
+/**
+ * Sesuaikan ukuran gambar ke ukuran jendela browser supaya pas dan tidak
+ * gepeng. Dipanggil saat game dibuka dan tiap kali ukuran layar berubah.
+ */
 export function resizeViewport(canvas) {
   const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
   const cssW = window.innerWidth;
@@ -42,7 +56,7 @@ export function resizeViewport(canvas) {
   canvas.width = Math.round(cssW * dpr);
   canvas.height = Math.round(cssH * dpr);
 
-  // Fit layar logis (390x640) ke window, bukan seluruh WORLD_W
+  // Cari skala biar area terlihat (390x640) muat penuh di jendela
   const scale = Math.min(canvas.width / VIEWPORT_W, canvas.height / VIEWPORT_H);
   viewport.scale = scale;
   viewport.dpr = dpr;
@@ -50,6 +64,10 @@ export function resizeViewport(canvas) {
   viewport.offsetY = (canvas.height - VIEWPORT_H * scale) / 2;
 }
 
+/**
+ * Ubah posisi sentuhan/klik di layar jadi posisi sebenarnya di dunia game
+ * (memperhitungkan skala layar dan posisi kamera saat itu).
+ */
 export function clientToLogical(canvas, clientX, clientY) {
   const rect = canvas.getBoundingClientRect();
   const bx = (clientX - rect.left) * (canvas.width / rect.width);

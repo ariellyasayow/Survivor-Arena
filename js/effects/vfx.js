@@ -1,40 +1,49 @@
-// Sistem efek visual ringan: partikel & teks melayang.
-// Dioptimasi mengikuti acuan drop_n_dash/src/particles.js:
-//  - object pooling (pool statis, tidak alokasi objek tiap spawn)
-//  - swap-and-pop O(1) untuk hapus (bukan Array.filter yang alokasi array baru)
-//  - cap jumlah partikel maksimum (di-tune oleh adaptive quality)
+// =============================================
+//  vfx.js — Efek visual: percikan & teks melayang
+// =============================================
+// Menangani "partikel" (titik-titik kecil yang muncrat saat kena tembak/naik
+// level) dan teks yang melayang naik lalu hilang (misalnya "+10").
+//
+// Supaya ringan, partikel tidak dibuat-buang terus-menerus. Kita siapkan
+// sekumpulan partikel di awal, lalu pakai ulang: yang sudah selesai ditandai
+// "menganggur" dan bisa dipakai lagi nanti.
 
 import { PARTICLE_POOL_SIZE, MAX_PARTICLES_HIGH } from '../config.js';
 
-// Font teks melayang di-cache sebagai konstanta (hindari re-parse string tiap frame).
+// Jenis huruf teks melayang, disimpan sekali biar tidak dihitung ulang terus.
 const F_FLOATING = 'bold 12px sans-serif';
 
-// ── Cap partikel (diatur adaptive quality via setMaxParticles) ──
+// Batas jumlah partikel yang boleh aktif bersamaan (diatur sistem kualitas).
 let _maxParticles = MAX_PARTICLES_HIGH;
+
+/** Atur batas jumlah partikel (dikurangi otomatis di perangkat lemah). */
 export function setMaxParticles(n) { _maxParticles = n; }
 
-// ── Object pool ─────────────────────────────
+/** Bikin satu partikel kosong. */
 function makeParticle() {
   return { x: 0, y: 0, vx: 0, vy: 0, life: 0, maxLife: 0, size: 0, color: '', active: false };
 }
 
+// Stok partikel yang dipakai ulang.
 const pool = [];
 for (let i = 0; i < PARTICLE_POOL_SIZE; i++) pool.push(makeParticle());
 
+/** Ambil satu partikel yang sedang menganggur dari stok. */
 function acquireParticle() {
   for (let i = 0; i < pool.length; i++) {
     if (!pool[i].active) return pool[i];
   }
-  // Pool habis — buat baru (fallback, jarang terjadi karena ada cap).
+  // Stok habis (jarang) — bikin baru.
   const p = makeParticle();
   pool.push(p);
   return p;
 }
 
-// ── Partikel aktif ──────────────────────────
+// Daftar partikel & teks yang sedang tampil.
 let particles = [];
 let floatingTexts = [];
 
+/** Munculkan satu partikel di posisi tertentu dengan arah, umur, ukuran, warna. */
 function emit(x, y, vx, vy, life, size, color) {
   if (particles.length >= _maxParticles) return;
   const p = acquireParticle();
@@ -46,6 +55,7 @@ function emit(x, y, vx, vy, life, size, color) {
   particles.push(p);
 }
 
+/** Muncrat ke segala arah saat sesuatu kena tembak/pukul. */
 export function spawnHitParticles(x, y, color = '#FF5470', count = 8) {
   for (let i = 0; i < count; i++) {
     const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
@@ -54,6 +64,7 @@ export function spawnHitParticles(x, y, color = '#FF5470', count = 8) {
   }
 }
 
+/** Semburan melingkar penuh, dipakai saat naik level / pindah stage. */
 export function spawnLevelUpBurst(x, y, color = '#FFC857') {
   for (let i = 0; i < 16; i++) {
     const angle = (Math.PI * 2 * i) / 16;
@@ -62,12 +73,14 @@ export function spawnLevelUpBurst(x, y, color = '#FFC857') {
   }
 }
 
+/** Tampilkan teks yang melayang naik lalu memudar (misal "+10", "LEVEL UP!"). */
 export function spawnFloatingText(x, y, text, color = '#EAF2FF') {
   floatingTexts.push({ x, y, text, color, life: 0.8, maxLife: 0.8 });
 }
 
+/** Gerakkan & kurangi umur semua partikel + teks; buang yang sudah habis. */
 export function updateVFX(dt) {
-  // Swap-and-pop: hapus O(1) tanpa alokasi array baru.
+  // Cara buang cepat: pindahkan elemen terakhir ke slot yang dihapus.
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
     p.x += p.vx * dt;
@@ -93,8 +106,9 @@ export function updateVFX(dt) {
   }
 }
 
+/** Gambar semua partikel & teks yang sedang tampil ke layar. */
 export function drawVFX(ctx) {
-  // Partikel digambar sebagai fillRect (lebih murah dari arc), mengikuti acuan.
+  // Partikel digambar sebagai kotak kecil (lebih ringan daripada lingkaran).
   for (let i = 0; i < particles.length; i++) {
     const p = particles[i];
     const alpha = Math.max(0, p.life / p.maxLife);
@@ -118,6 +132,7 @@ export function drawVFX(ctx) {
   }
 }
 
+/** Bersihkan semua partikel & teks (saat mulai ulang / ganti stage). */
 export function clearVFX() {
   for (let i = 0; i < particles.length; i++) particles[i].active = false;
   particles.length = 0;

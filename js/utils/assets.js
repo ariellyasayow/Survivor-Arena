@@ -1,20 +1,22 @@
-// Loader gambar ringan dengan fallback otomatis + helper animasi.
+// =============================================
+//  assets.js — Pemuat & pengatur gambar animasi
+// =============================================
+// Tugasnya memuat gambar karakter/item dan membantu memainkan animasinya.
 //
-// Filosofi: game ini didesain dari awal buat gambar primitif lewat Canvas API
-// (lihat entity draw() masing-masing). Sprite gambar itu OPSIONAL — kalau file
-// belum ada di assets/spritesheets/, entity tetap jalan pakai bentuk primitif
-// yang sekarang. Begitu file sprite ditaruh di path yang benar, game otomatis
-// pakai gambar itu tanpa perlu ubah kode lain.
+// Gambar di sini sifatnya OPSIONAL. Kalau filenya belum ada, game tetap jalan
+// dengan menggambar bentuk sederhana (lingkaran/kotak) sebagai gantinya. Begitu
+// filenya ditaruh di folder yang benar, game otomatis pakai gambar itu — tidak
+// perlu ubah kode lain.
 //
-// Semua sprite sheet di sini tersusun HORIZONTAL (frame berjejer kiri->kanan),
-// tiap frame berukuran fw x fh. Semua sprite karakter (player/enemy) digambar
-// menghadap WEST (kiri); untuk hadap kanan tinggal di-mirror saat menggambar.
+// Satu file gambar berisi banyak "frame" (pose) yang dijejer ke kanan. Dengan
+// mengganti frame yang ditampilkan secara berurutan, gambar jadi seperti
+// bergerak (animasi). Semua karakter digambar menghadap kiri; untuk menghadap
+// kanan tinggal dibalik saat menggambar.
 //
-// Struktur folder: assets/spritesheets/<objek>/<animasi>.webp — satu subfolder
-// per objek game (player, enemy1, enemy2, enemy3, coin, orb, heart, tree, rock).
+// Lokasi file: assets/spritesheets/<objek>/<animasi>.webp
 
-// - src: path relatif ke assets/spritesheets/
-// - frames: jumlah frame di sheet (1 = statis)
+// Daftar semua gambar: src = lokasi file, frames = jumlah pose,
+// fw/fh = lebar & tinggi satu frame (dalam piksel).
 // - fw/fh: ukuran satu frame dalam px
 const SPRITE_MANIFEST = {
   // Player (hadap kiri) — beberapa klip animasi
@@ -47,8 +49,13 @@ const SPRITE_MANIFEST = {
   rock: { src: 'assets/spritesheets/rock/rock.webp', frames: 1, fw: 48, fh: 48 },
 };
 
+// Tempat menyimpan gambar yang sudah dimuat, biar tidak dimuat berulang.
 const sprites = {};
 
+/**
+ * Muat satu gambar. Kalau filenya tidak ada, tidak error — gambar cuma ditandai
+ * "belum siap" supaya game pakai bentuk sederhana sebagai gantinya.
+ */
 function loadOne(key, def) {
   return new Promise((resolve) => {
     const img = new Image();
@@ -67,8 +74,11 @@ function loadOne(key, def) {
 
 let preloaded = false;
 
-// Panggil sekali di awal (sebelum game start) buat coba load semua sprite.
-// Aman dipanggil walau belum ada file gambar sama sekali — tidak pernah reject.
+/**
+ * Muat semua gambar sekaligus. Dipanggil sekali sebelum game mulai supaya
+ * gambar tidak muncul mendadak di tengah permainan. Aman walau belum ada
+ * satu pun file gambar.
+ */
 export async function preloadSprites(onProgress) {
   if (preloaded) return sprites;
   const keys = Object.keys(SPRITE_MANIFEST);
@@ -85,26 +95,31 @@ export async function preloadSprites(onProgress) {
   return sprites;
 }
 
+/** Ambil data gambar tertentu; null saat gambarnya belum ada. */
 export function getSprite(key) {
   return sprites[key] || null;
 }
 
+/** Cek apakah gambar sudah siap dipakai. */
 export function spriteReady(key) {
   const sp = sprites[key];
   return !!(sp && sp.ready);
 }
 
+/** Jumlah pose (frame) dalam satu gambar animasi. */
 export function frameCount(key) {
   const sp = sprites[key];
   return sp ? sp.frames : 0;
 }
 
-// Hitung index frame dari waktu yang sudah berlalu di klip (detik).
-// mode:
-//  - 'loop'     : 0,1,2,..,n-1,0,1,..        (default)
-//  - 'pingpong' : 0,1,2,..,n-1,n-2,..,1,0,.. (bolak-balik, mulus tanpa lompat)
-//  - 'once'     : maju sampai frame terakhir lalu berhenti di sana
-// Kembalikan { index, done } — done=true hanya relevan untuk 'once'.
+/**
+ * Tentukan pose (frame) mana yang harus ditampilkan sekarang, berdasarkan
+ * berapa lama animasi sudah berjalan. Ada tiga cara main:
+ *   - 'loop'     : diputar berulang dari awal (misal jalan kaki)
+ *   - 'pingpong' : maju lalu mundur, biar mulus tanpa loncat
+ *   - 'once'     : maju sekali lalu berhenti di pose terakhir (misal mati)
+ * fps = seberapa cepat animasinya (makin besar makin cepat).
+ */
 export function frameForClip(key, clipTime, fps = 10, mode = 'loop') {
   const n = frameCount(key) || 1;
   if (n <= 1) return { index: 0, done: true };
@@ -127,9 +142,11 @@ export function frameForClip(key, clipTime, fps = 10, mode = 'loop') {
   return { index: step % n, done: false };
 }
 
-// Gambar satu frame sprite sheet, berpusat di (x, y), ukuran render `size`.
-// mirror=true membalik horizontal (dipakai buat hadap kanan/East karena
-// sprite sumber menghadap kiri/West).
+/**
+ * Gambar satu pose (frame) ke layar, dengan titik (x, y) sebagai pusatnya.
+ * mirror = true membalik gambar ke kiri/kanan (buat menghadap arah lain).
+ * Mengembalikan false saat gambarnya belum siap.
+ */
 export function drawSprite(ctx, key, x, y, size, frameIndex = 0, mirror = false) {
   const sp = sprites[key];
   if (!sp || !sp.ready) return false;

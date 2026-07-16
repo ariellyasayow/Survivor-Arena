@@ -1,4 +1,9 @@
-// Environment: ground bertekstur + obstacle pohon/batu.
+// =============================================
+//  background.js — Latar: rumput + pohon & batu
+// =============================================
+// Menggambar latar tempat bermain. Karena latar tidak berubah, ia digambar
+// sekali ke sebuah gambar tersimpan, lalu tinggal ditempel tiap frame biar
+// hemat tenaga. Pohon bergoyang digambar di atasnya saat gambarnya tersedia.
 import { spriteReady, drawSprite, frameForClip } from '../utils/assets.js';
 
 export const WORLD_W = 1200;
@@ -55,6 +60,7 @@ const PALETTE = {
   },
 };
 
+/** Pembuat angka acak yang hasilnya selalu sama, biar pola rumput tetap konsisten. */
 function mulberry32(seed) {
   return function () {
     seed |= 0; seed = (seed + 0x6D2B79F5) | 0;
@@ -64,6 +70,7 @@ function mulberry32(seed) {
   };
 }
 
+/** Taburkan bintik-bintik kecil di rumput biar tidak polos. */
 function drawGrassSpeckle(ctx, p) {
   const rand = mulberry32(1337);
   const count = 3000; // Ditingkatkan untuk peta 1200x1200
@@ -81,6 +88,7 @@ function drawGrassSpeckle(ctx, p) {
   ctx.globalAlpha = 1;
 }
 
+/** Gambar pohon sederhana (dipakai sebelum gambar pohon dimuat). */
 function drawTree(ctx, x, y, r, p) {
   ctx.fillStyle = p.treeShadow;
   ctx.beginPath();
@@ -98,6 +106,7 @@ function drawTree(ctx, x, y, r, p) {
   ctx.fill();
 }
 
+/** Gambar batu sederhana (dipakai sebelum gambar batu dimuat). */
 function drawRock(ctx, x, y, r, p) {
   ctx.fillStyle = p.rockShadow;
   ctx.beginPath();
@@ -119,8 +128,13 @@ function drawRock(ctx, x, y, r, p) {
   ctx.fill();
 }
 
+// Gambar latar yang sudah jadi, disimpan untuk siang & malam.
 const cache = { day: null, night: null };
 
+/**
+ * Gambar seluruh latar (rumput + pohon/batu + bintang saat malam) sekali saja,
+ * lalu simpan hasilnya biar tinggal dipakai ulang.
+ */
 function buildCache(isNight) {
   const key = isNight ? 'night' : 'day';
   const p = PALETTE[key];
@@ -182,6 +196,7 @@ function buildCache(isNight) {
   cache[key] = off;
 }
 
+/** Tempel latar ke layar (dibuat dulu saat pertama kali), lalu pohon yang bergoyang. */
 export function drawBackground(ctx, isNight) {
   const key = isNight ? 'night' : 'day';
   if (!cache[key]) buildCache(isNight);
@@ -189,6 +204,7 @@ export function drawBackground(ctx, isNight) {
   drawTreesAnimated(ctx, isNight);
 }
 
+/** Gambar pohon yang bergoyang di atas latar, saat gambarnya tersedia. */
 function drawTreesAnimated(ctx, isNight) {
   if (!spriteReady('tree')) return;
   const t = performance.now() / 1000;

@@ -1,6 +1,10 @@
+// =============================================
+//  point.js — Koin yang dikumpulkan player
+// =============================================
 import { drawSprite, frameForClip } from '../utils/assets.js';
 
 export class PointItem {
+  // x, y = posisi koin; value = berapa poin yang diberikan saat diambil.
   constructor(x, y, value = 1) {
     this.x = x;
     this.y = y;
@@ -10,6 +14,7 @@ export class PointItem {
     this.spawnTime = performance.now();
   }
 
+  /** Gambar koin berputar. Sebelum gambarnya dimuat, tampil sebagai lingkaran kuning. */
   draw(ctx, elapsedTime) {
     const pulse = 1 + Math.sin(elapsedTime * 4 + this.x) * 0.15;
 

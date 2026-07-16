@@ -1,6 +1,13 @@
-// --- DITAMBAHKAN TIPE BARU 'rapid' ---
+// =============================================
+//  powerup-effects.js — Daftar & efek power-up
+// =============================================
+// Mengatur item bonus yang bisa diambil player: apa saja jenisnya, warnanya,
+// dan apa efeknya saat diambil.
+
+// Semua jenis power-up yang bisa muncul (dipilih acak saat memunculkannya).
 export const POWERUP_TYPES = ['life', 'damage', 'speed', 'shotgun', 'rapid'];
 
+// Warna & tulisan tiap jenis — dipakai buat gambar item, peta kecil, dan HUD.
 export const POWERUP_META = {
   life: { color: '#FF5470', label: '+Nyawa' },
   damage: { color: '#FF6F59', label: 'Damage+' },
@@ -9,35 +16,40 @@ export const POWERUP_META = {
   rapid: { color: '#FF8C00', label: 'Mesin!' }, // <--- WARNA ORANYE MENYALA
 };
 
+// Lama tiap efek bertahan (dalam detik).
 const DAMAGE_BUFF_SECONDS = 8;
 const SPEED_BUFF_SECONDS = 6;
-const SHOTGUN_BUFF_SECONDS = 10; // <--- MODIFIKASI: DURASI SHOTGUN 10 DETIK
-const RAPID_BUFF_SECONDS = 5;    // <--- MODIFIKASI: DURASI RAPID FIRE 5 DETIK
+const SHOTGUN_BUFF_SECONDS = 10;
+const RAPID_BUFF_SECONDS = 5;
 
+/**
+ * Jalankan efek power-up saat player mengambilnya:
+ *   - life   : tambah 1 nyawa (tidak melebihi batas maksimal)
+ *   - damage : peluru lebih sakit selama beberapa detik
+ *   - speed  : lari lebih cepat selama beberapa detik
+ *   - shotgun: tembakan menyebar selama beberapa detik
+ *   - rapid  : menembak sangat cepat selama beberapa detik
+ * Untuk efek sementara, kita catat sampai detik ke berapa efeknya berlaku.
+ */
 export function applyPowerUp(type, player, game) {
   switch (type) {
     case 'life':
-      // Menambah hati (nyawa) dengan maksimal sesuai maxLives
       game.lives = Math.min(game.maxLives, game.lives + 1);
       break;
     case 'damage':
-      // Peluru sakit sementara waktu (+5 damage selama 8 detik)
       player.baseDamage += 5;
       player.damageBuffUntil = game.elapsedTime + DAMAGE_BUFF_SECONDS;
       setTimeout(() => { player.baseDamage -= 5; }, DAMAGE_BUFF_SECONDS * 1000);
       break;
     case 'speed':
-      // Kecepatan lari bertambah drastis sementara (+40 speed selama 6 detik)
       player.baseSpeed += 40;
       player.speedBuffUntil = game.elapsedTime + SPEED_BUFF_SECONDS;
       setTimeout(() => { player.baseSpeed -= 40; }, SPEED_BUFF_SECONDS * 1000);
       break;
     case 'shotgun':
-      // --- MODIFIKASI: DIUBAH DARI PERMANEN MENJADI TIMER 10 DETIK ---
       player.shotgunBuffUntil = game.elapsedTime + SHOTGUN_BUFF_SECONDS;
       break;
     case 'rapid':
-      // --- MODIFIKASI: AKTIFKAN MODE SENAPAN MESIN SELAMA 5 DETIK ---
       player.rapidBuffUntil = game.elapsedTime + RAPID_BUFF_SECONDS;
       break;
   }

@@ -1,3 +1,9 @@
+// =============================================
+//  main.js — Titik awal & pengatur jalannya game
+// =============================================
+// File pertama yang dijalankan. Tugasnya menyiapkan layar, menyesuaikan
+// kualitas ke kekuatan HP, menangkap kontrol pemain (keyboard & joystick),
+// lalu menjalankan perulangan utama game (update + gambar terus-menerus).
 import { Game } from './game.js';
 import { unlockAudio } from './effects/sfx.js';
 import { preloadSprites } from './utils/assets.js';
@@ -7,23 +13,17 @@ import { resizeViewport } from './viewport.js';
 import { MAX_PARTICLES_HIGH, MAX_PARTICLES_LOW } from './config.js';
 import { initTutorial, notifyInput, isBlockingGameplay, reposition as repositionTutorial } from './tutorial.js';
 
-// ---- Deteksi kualitas render (SEKALI di awal, bukan pantau FPS) -----------
-// Sebelumnya sistem ini memantau FPS tiap frame selama main dan menurunkan
-// kualitas secara dinamis kalau lag berkepanjangan. Sekarang disederhanakan:
-// kualitas ditentukan SEKALI di sini berdasarkan kemampuan device (jumlah
-// core CPU, RAM kalau browser mendukung `navigator.deviceMemory`), lalu
-// tetap sama sepanjang sesi bermain — lebih sederhana & hasilnya konsisten.
-//
-// Testing manual: tambahkan ?quality=low / ?quality=medium / ?quality=high
-// di URL untuk memaksa level tertentu tanpa tergantung device asli.
+// ---- Menentukan kualitas gambar (sekali di awal) --------------------------
+// Ditentukan dari kekuatan HP/laptop dan tidak berubah selama main.
+/** Tebak kualitas gambar dari kekuatan perangkat (bisa dipaksa lewat ?quality=). */
 function detectDeviceQuality() {
   const forced = new URLSearchParams(location.search).get('quality');
   if (forced === 'low' || forced === 'medium' || forced === 'high') {
     return forced;
   }
 
-  const cpuCores = navigator.hardwareConcurrency || 4; // fallback aman kalau API tidak didukung
-  const ramGB = navigator.deviceMemory; // hanya didukung Chrome/Edge; undefined di browser lain
+  const cpuCores = navigator.hardwareConcurrency || 4; // jumlah inti prosesor (default 4 saat tak terbaca)
+  const ramGB = navigator.deviceMemory; // besar RAM; sebagian browser tidak menyediakannya
 
   if (cpuCores <= 2 || (ramGB !== undefined && ramGB <= 2)) return 'low';
   if (cpuCores <= 4 || (ramGB !== undefined && ramGB <= 4)) return 'medium';
@@ -40,7 +40,7 @@ if (deviceQuality === 'medium') {
 
 const canvas = document.getElementById('game-canvas');
 
-// ---- Layout: canvas full-screen + skala letterbox (jaga rasio) -------------
+// ---- Sesuaikan ukuran layar & ikuti perubahannya --------------------------
 resizeViewport(canvas);
 window.addEventListener('resize', () => {
   resizeViewport(canvas);
@@ -49,12 +49,11 @@ window.addEventListener('resize', () => {
 
 const game = new Game(canvas);
 
-// Preload sprite (kalau ada) sebelum game loop jalan, supaya tidak ada
-// gambar "pop-in" di tengah gameplay. Aman walau belum ada file gambar
-// sama sekali — entity fallback ke bentuk primitif Canvas.
+// Muat semua gambar dulu sebelum game mulai, biar tidak ada gambar yang
+// muncul mendadak di tengah permainan. Aman walau gambarnya belum ada.
 await preloadSprites();
 
-// ---- Input keyboard (buat testing di desktop) ------------------------------
+// ---- Kontrol keyboard (buat main di komputer) ------------------------------
 const keys = { up: false, down: false, left: false, right: false };
 
 window.addEventListener('keydown', (e) => {
@@ -72,10 +71,9 @@ window.addEventListener('keyup', (e) => {
   if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
 });
 
-// ---- Virtual joystick floating (buat mobile/touch) --------------------------
-// Joystick TIDAK terkunci di satu posisi: muncul tepat di titik jari user
-// pertama menyentuh zona kiri layar (#touch-controls), lalu drag dihitung
-// relatif terhadap titik sentuh awal itu (origin), bukan posisi DOM tetap.
+// ---- Joystick sentuh (buat main di HP) -------------------------------------
+// Joystick tidak diam di satu tempat: ia muncul persis di titik jari pertama
+// kali menyentuh sisi kiri layar, lalu arah gerak dihitung dari titik itu.
 const touchZone = document.getElementById('touch-controls');
 const joystickBase = document.getElementById('joystick-base');
 const joystickStick = document.getElementById('joystick-stick');
@@ -85,6 +83,7 @@ let originX = 0;
 let originY = 0;
 const JOYSTICK_MAX = 34;
 
+/** Munculkan joystick di titik sentuh, jadikan origin drag. */
 function showJoystickAt(clientX, clientY) {
   const rect = touchZone.getBoundingClientRect();
   originX = clientX;
@@ -94,6 +93,7 @@ function showJoystickAt(clientX, clientY) {
   joystickBase.classList.add('active');
 }
 
+/** Hitung vektor joystick (-1..1) dari posisi jari. */
 function joystickPointFromEvent(clientX, clientY) {
   let dx = clientX - originX;
   let dy = clientY - originY;
@@ -106,6 +106,7 @@ function joystickPointFromEvent(clientX, clientY) {
   joystickVector = { x: dx / JOYSTICK_MAX, y: dy / JOYSTICK_MAX };
 }
 
+/** Sembunyikan joystick & nol-kan input. */
 function resetJoystick() {
   joystickBase.classList.remove('active');
   joystickStick.style.transform = 'translate(0px, 0px)';
@@ -148,14 +149,15 @@ window.addEventListener('touchcancel', (e) => {
 // Klik untuk unlock audio (aturan autoplay browser)
 window.addEventListener('pointerdown', () => unlockAudio());
 
-// Cegah context-menu (long-press) & seleksi teks saat interaksi di canvas.
+// Matikan menu klik-kanan & seleksi teks saat menyentuh area game.
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
-// ---- Tutorial interaktif "How to Play" -------------------------------------
-// Menggantikan hint swipe sederhana sebelumnya: sekarang menyorot tiap
-// komponen HUD lalu diakhiri tutorial gerakan (lihat js/tutorial.js).
+// ---- Tutorial "Cara Main" --------------------------------------------------
+// Panduan yang menyorot tiap bagian tampilan lalu diakhiri latihan gerak
+// (selengkapnya di js/tutorial.js).
 initTutorial(canvas);
 
+/** Satukan joystick + keyboard jadi satu arah gerak. */
 function currentInputVector() {
   let x = joystickVector.x;
   let y = joystickVector.y;
@@ -173,25 +175,27 @@ function currentInputVector() {
   return { x, y };
 }
 
-// ---- Game loop -------------------------------------------------------------
+// ---- Perulangan utama game -------------------------------------------------
 let lastTime = -1;
 
+/** Perulangan utama: baca kontrol, perbarui game (kecuali dijeda tutorial), gambar. */
 function loop(now) {
-  // Frame pertama atau balik dari tab background (>500ms): reset, jangan
-  // update fisika biar tidak ada lompatan.
+  // Frame pertama atau baru balik dari tab lain: lewati sekali biar game tidak
+  // melompat karena jeda waktunya kelewat besar.
   if (lastTime < 0 || now - lastTime > 500) {
     lastTime = now;
     requestAnimationFrame(loop);
     return;
   }
 
-  const dt = Math.min(0.05, (now - lastTime) / 1000); // clamp anti spiral
+  // dt = selisih waktu sejak frame lalu (detik). Dibatasi biar tidak melonjak.
+  const dt = Math.min(0.05, (now - lastTime) / 1000);
   lastTime = now;
 
   const input = currentInputVector();
   notifyInput(input.x, input.y);
-  // Selama langkah HUD tutorial (1-5), gameplay dijeda supaya pemain fokus
-  // baca tooltip; render tetap jalan agar layar tidak kosong di baliknya.
+  // Saat tutorial sedang menjelaskan bagian tampilan, game dijeda biar pemain
+  // bisa fokus membaca. Tampilannya tetap digambar supaya layar tidak kosong.
   if (!isBlockingGameplay()) game.update(dt, input);
   game.render();
 

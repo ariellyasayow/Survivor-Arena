@@ -1,12 +1,17 @@
+// =============================================
+//  enemy3.js — Musuh 3: penembak laser jarak jauh
+// =============================================
+// Musuh yang mendekat sampai player masuk jarak tembak, lalu berhenti dan
+// menembakkan laser secara berkala (diberi jeda biar tidak terlalu sering).
+//
+// Fungsi dasar yang sama dengan musuh 1 (mengurangi darah, menandai kalah,
+// memulai animasi mati) dijelaskan di enemy.js — di sini fokus ke lasernya.
 import { drawSprite, frameForClip, spriteReady } from '../utils/assets.js';
 
 let enemy3IdCounter = 0;
 
-// Enemy3: serangan jarak jauh dengan projectile
-// - HP sama dengan enemy1
-// - Attack: tembak peluru ke player saat dalam range 240px (1.5x player range)
-// - Tipe peluru: sedikit berbeda dari player (berwarna gelap)
 export class Enemy3 {
+  // Sama seperti musuh 1; damage di sini dipakai untuk lasernya.
   constructor(x, y, hp, damage, speed) {
     this.id = enemy3IdCounter++;
     this.x = x;
@@ -43,6 +48,7 @@ export class Enemy3 {
     this.refireDelay = this.attackDuration * 0.35;
   }
 
+  /** Tiap frame: mendekat selama player jauh, lalu berhenti & menembak saat dekat. */
   update(dt, target, elapsedTime, obstacles) {
     if (this.dying) {
       this.deathTime += dt;
@@ -120,6 +126,7 @@ export class Enemy3 {
     }
   }
 
+  // takeDamage, defeated, isTargetable, startDeath, isGone: sama seperti musuh 1.
   takeDamage(amount, elapsedTime) {
     if (this.dying) return;
     this.hp -= amount;
@@ -131,7 +138,6 @@ export class Enemy3 {
     return this.hp <= 0;
   }
 
-  // Enemy3 bisa ditembak kapan saja selama hidup (termasuk saat menembak).
   get isTargetable() {
     return !this.dying;
   }
@@ -149,9 +155,7 @@ export class Enemy3 {
     return this.deathTime >= 0.3; // 3 frame @ 10fps
   }
 
-  // Enemy3 melepas laser tepat saat animasi mencapai frame pelepasan (sekali
-  // per siklus animasi, dan hanya kalau cooldown fire rate sudah habis).
-  // game.js memanggil ini tiap frame.
+  /** Cek apakah laser dilepas saat ini (sekali tiap gerakan menembak). */
   shouldFireLaser() {
     if (!this.attacking || this.dying || this.firedThisCycle) return false;
     if (this.attackTime >= this.laserFireTime) {
@@ -161,6 +165,7 @@ export class Enemy3 {
     return false;
   }
 
+  /** Gambar musuh sesuai keadaannya (jalan/nembak/mati) + bar darah kecil. */
   draw(ctx, elapsedTime) {
     const flashing = elapsedTime < this.hitFlashUntil;
     // Sprite Demon_1 default menghadap KANAN (East), jadi mirror saat hadap kiri.

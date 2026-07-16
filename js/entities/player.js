@@ -1,8 +1,14 @@
+// =============================================
+//  player.js — Karakter pemain
+// =============================================
+// Mengurus gerak player, tembakannya, dan efek-efek bonus sementara yang
+// didapat dari power-up (damage naik, lari cepat, shotgun, tembak cepat).
 import { clamp } from '../utils/helpers.js';
 import { WORLD_W, WORLD_H, OBSTACLES } from '../world/background.js';
 import { drawSprite, frameForClip, spriteReady } from '../utils/assets.js';
 
 export class Player {
+  /** Tempatkan player di tengah dunia dengan kemampuan awal. */
   constructor() {
     this.x = WORLD_W / 2;
     this.y = WORLD_H / 2;
@@ -33,30 +39,34 @@ export class Player {
     this.deathTime = 0;      // waktu berjalan sejak mulai animasi death
   }
 
+  /**
+   * Kekuatan tiap peluru: kekuatan dasar + bonus dari naik level. Saat mode
+   * tembak-cepat aktif, kekuatannya sedikit dikurangi biar tetap seimbang.
+   */
   get damage() {
-    // Naik level (xp) menambah damage, sesuai "XP (tambah damage)" di Game UI.
     let currentDamage = this.baseDamage + (this.powerLevel || 0) * 2;
-    // --- MODIFIKASI OPSI 3: KURANGI SEDIKIT DAMAGE AGAR RAPID FIRE SEIMBANG ---
     if (this.hasRapidFire(this.currentElapsedTime)) {
-      currentDamage = Math.max(1, Math.round(currentDamage * 0.7)); // Damage turun 30%
+      currentDamage = Math.max(1, Math.round(currentDamage * 0.7)); // turun 30%
     }
     return currentDamage;
   }
 
-  // Dipanggil game.js tiap kali player berhasil menembak — amunisi infinite,
-  // tidak ada magazine/reload lagi.
+  /** Dipanggil tiap kali menembak (peluru tak terbatas, tanpa isi ulang). */
   notifyShot(elapsedTime) {
-    this.firingUntil = elapsedTime + 0.35; // durasi tampil animasi firing
+    this.firingUntil = elapsedTime + 0.35; // lama tampil pose menembak
   }
 
+  /** Menandakan player sedang kebal (baru saja kena serangan). */
   isInvulnerable(elapsedTime) {
     return elapsedTime < this.invulnerableUntil;
   }
 
+  /** Beri kebal sebentar setelah kena serangan, biar tidak langsung kena lagi. */
   takeHit(elapsedTime, invulnSeconds = 1) {
     this.invulnerableUntil = elapsedTime + invulnSeconds;
   }
 
+  /** Mulai animasi player mati. */
   startDeath() {
     if (!this.dead) {
       this.dead = true;
@@ -64,13 +74,14 @@ export class Player {
     }
   }
 
-  // --- MODIFIKASI OPSI 3: METHOD PENGECEKAN STATUS RAPID FIRE ---
+  /** Sedang dalam mode tembak-cepat ('Mesin!'). */
   hasRapidFire(elapsedTime) {
     return elapsedTime < this.rapidBuffUntil;
   }
 
+  /** Tiap frame: gerakkan player sesuai arahan, tahan agar tidak menembus pohon/batu. */
   update(dt, input, elapsedTime) {
-    this.currentElapsedTime = elapsedTime; // Simpan untuk referensi getter damage
+    this.currentElapsedTime = elapsedTime; // dipakai oleh perhitungan damage di atas
     if (this.dead) {
       this.deathTime += dt;
       return;
@@ -84,8 +95,8 @@ export class Player {
       dx /= len;
       dy /= len;
       this.facing = { x: dx, y: dy };
-      // Update arah hadap horizontal hanya kalau ada komponen kiri/kanan.
-      // Gerak vertikal murni mempertahankan arah hadap terakhir.
+      // Arah hadap kiri/kanan hanya berubah saat ada gerakan mendatar.
+      // Gerak naik-turun saja mempertahankan arah hadap terakhir.
       if (Math.abs(dx) > 0.01) this.facingDir = dx < 0 ? -1 : 1;
     } else {
       dx = 0;
@@ -95,7 +106,7 @@ export class Player {
     let nextX = this.x + dx * this.baseSpeed * dt;
     let nextY = this.y + dy * this.baseSpeed * dt;
 
-    // Soft collision terhadap obstacle (pohon/batu): dorong keluar kalau tabrakan.
+    // Kalau nabrak pohon/batu, dorong player keluar biar tidak menembusnya.
     for (const o of OBSTACLES) {
       const ddx = nextX - o.x;
       const ddy = nextY - o.y;
@@ -116,20 +127,22 @@ export class Player {
     this.clipTime += dt;
   }
 
+  /** Seberapa jauh player bisa melihat saat malam. */
   currentVisionRadius(elapsedTime, baseRadius) {
     return baseRadius;
   }
 
+  /** Seberapa jauh peluru player bisa terbang. */
   currentBulletRange(elapsedTime) {
     return this.baseRange;
   }
 
-  // --- MODIFIKASI: SEKARANG MENGECEK DURASI WAKTU (BUKAN PERMANEN LAGI) ---
+  /** Sedang dalam mode shotgun (tembakan menyebar). */
   hasShotgun(elapsedTime) {
     return elapsedTime < this.shotgunBuffUntil;
   }
 
-  // Pilih klip animasi aktif berdasarkan state. Mengembalikan nama sprite key.
+  /** Tentukan pose player yang pas sekarang (diam/jalan/nembak/mati). */
   _activeClip(elapsedTime) {
     if (this.dead) return 'playerDeath';
     if (elapsedTime < this.firingUntil) return 'playerFiring';
@@ -137,8 +150,9 @@ export class Player {
     return 'playerIdle';
   }
 
+  /** Gambar player sesuai posenya. Sebelum gambarnya dimuat, tampil sebagai bulatan. */
   draw(ctx, elapsedTime) {
-    const mirror = this.facingDir > 0; // sprite sumber hadap kiri; kanan = mirror
+    const mirror = this.facingDir > 0; // gambar aslinya hadap kiri; kanan = dibalik
     const size = this.r * 4.2;         // render sedikit lebih besar dari radius fisik
 
     // --- Path sprite ---
@@ -163,7 +177,7 @@ export class Player {
       return;
     }
 
-    // --- Fallback primitif (kalau sprite belum ada) ---
+    // --- Bentuk cadangan (dipakai sebelum gambar dimuat) ---
     const blinking = this.isInvulnerable(elapsedTime) && Math.floor(elapsedTime * 12) % 2 === 0;
     if (blinking) ctx.globalAlpha = 0.4;
 

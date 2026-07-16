@@ -1,11 +1,17 @@
+// =============================================
+//  projectile.js — Satu peluru (player / laser musuh)
+// =============================================
 export class Projectile {
   constructor() {
-    // Konstruktor kosong: instance dipakai ulang lewat pool (lihat reset()).
+    // Dibuat kosong dulu; datanya diisi lewat reset() saat mau ditembakkan.
     this.active = false;
     this.reset(0, 0, 0, 0, 0, 0, false);
   }
 
-  // Isi ulang instance yang sama dengan data tembakan baru (dipakai pool).
+  /**
+   * Isi ulang peluru ini dengan data tembakan baru. Karena peluru dipakai
+   * ulang, kita cukup menimpa datanya daripada bikin objek baru tiap menembak.
+   */
   reset(x, y, dirX, dirY, range, damage, isEnemy = false) {
     this.x = x;
     this.y = y;
@@ -26,6 +32,7 @@ export class Projectile {
     return this;
   }
 
+  /** Majukan peluru; tandai selesai setelah menempuh jarak maksimal. */
   update(dt) {
     // --- MODIFIKASI KECEPATAN LASER ---
     // Diperlambat dari 520 ke 260 px/detik agar seimbang[cite: 4]
@@ -42,6 +49,7 @@ export class Projectile {
     if (traveled >= this.range) this.dead = true;
   }
 
+  /** Gambar peluru: laser tampil sebagai garis bercahaya, selain itu bulatan. */
   draw(ctx) {
     if (this.isLaser) {
       // Laser: berkas garis dengan ekor bercahaya di belakang arah gerak.

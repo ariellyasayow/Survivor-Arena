@@ -1,3 +1,9 @@
+// =============================================
+//  hud.js — Info di layar (nyawa, skor, level, waktu)
+// =============================================
+// Info seperti nyawa, level, timer, dan skor ditampilkan sebagai tulisan HTML
+// di atas game, bukan digambar bareng game-nya. File ini bertugas memperbarui
+// tulisan-tulisan itu tiap saat supaya selalu sesuai keadaan game.
 import { formatTime } from '../utils/helpers.js';
 import { POWERUP_META } from '../effects/powerup-effects.js';
 
@@ -9,18 +15,19 @@ const levelBadgeEl = document.getElementById('level-badge');
 const xpFillEl = document.getElementById('xp-bar-fill');
 const buffListEl = document.getElementById('buff-list');
 
-// Definisi buff yang punya durasi & perlu ditampilkan di HUD.
-// --- MODIFIKASI: DIDAFTARKAN SHOTGUN (10s) DAN RAPID FIRE/MESIN (5s) ---
+// Daftar efek sementara yang perlu ditampilkan (beserta ikon & lama efeknya
+// dalam detik), buat memunculkan penanda hitung mundur di layar.
 const TRACKED_BUFFS = [
   { key: 'damageBuffUntil', type: 'damage', icon: '\u2694\ufe0f', duration: 8 },
   { key: 'speedBuffUntil', type: 'speed', icon: '\u26a1', duration: 6 },
-  { key: 'shotgunBuffUntil', type: 'shotgun', icon: '\ud83d\udca5', duration: 10 }, // <--- TAMBAHAN: IKON SHOTGUN
-  { key: 'rapidBuffUntil', type: 'rapid', icon: '\ud83d\udd25', duration: 5 },       // <--- TAMBAHAN: IKON MESIN
+  { key: 'shotgunBuffUntil', type: 'shotgun', icon: '\ud83d\udca5', duration: 10 },
+  { key: 'rapidBuffUntil', type: 'rapid', icon: '\ud83d\udd25', duration: 5 },
 ];
 
-// Cache elemen badge per tipe buff supaya tidak rebuild DOM tiap frame.
+// Simpan penanda efek yang sudah dibuat, biar tidak dibuat ulang tiap saat.
 const buffBadgeEls = {};
 
+/** Ambil penanda efek untuk satu jenis (dibuat sekali, lalu dipakai ulang). */
 function getBuffBadge(type) {
   if (buffBadgeEls[type]) return buffBadgeEls[type];
 
@@ -47,6 +54,7 @@ function getBuffBadge(type) {
   return els;
 }
 
+/** Perbarui semua info di layar (nyawa, level, timer, skor, XP, efek aktif). */
 export function updateHUD(game) {
   livesEl.textContent = '\u2764'.repeat(game.lives) + '\u2661'.repeat(Math.max(0, game.maxLives - game.lives));
   stageLabelEl.textContent = `Lvl ${game.stageIndex + 1}/${game.stageCount}`;

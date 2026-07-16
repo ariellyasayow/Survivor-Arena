@@ -1,7 +1,11 @@
+// =============================================
+//  powerup.js — Item power-up di dunia
+// =============================================
 import { POWERUP_META } from '../effects/powerup-effects.js';
 import { drawSprite, frameForClip, spriteReady } from '../utils/assets.js';
 
 export class PowerUpItem {
+  // x, y = posisi item; type = jenis power-up (lihat POWERUP_TYPES).
   constructor(x, y, type) {
     this.x = x;
     this.y = y;
@@ -10,6 +14,10 @@ export class PowerUpItem {
     this.collected = false;
   }
 
+  /**
+   * Gambar item power-up. Jenis 'life' tampil sebagai hati; jenis lain tampil
+   * sebagai bola mengkilap dengan warna sesuai jenisnya.
+   */
   draw(ctx, elapsedTime) {
     const meta = POWERUP_META[this.type];
     const color = meta ? meta.color : '#2DE1C7';
@@ -22,7 +30,7 @@ export class PowerUpItem {
       if (spriteReady('heart') && drawSprite(ctx, 'heart', this.x, y, this.r * 2.6, frame)) {
         return;
       }
-      // Fallback kalau sprite belum ada: hati merah primitif.
+      // Bentuk cadangan sebelum gambar dimuat: hati merah sederhana.
       ctx.fillStyle = color;
       ctx.beginPath();
       ctx.arc(this.x, y, this.r, 0, Math.PI * 2);

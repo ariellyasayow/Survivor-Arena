@@ -1,3 +1,13 @@
+// =============================================
+//  enemy.js — Musuh 1: pengejar jarak dekat
+// =============================================
+// Musuh yang mengejar player, lalu berhenti dan memukul saat sudah dekat.
+// Pukulannya melukai tepat di saat ayunan senjata (sekali tiap gerakan serang).
+//
+// Musuh 2 dan 3 (enemy2.js, enemy3.js) memakai beberapa fungsi yang sama
+// persis dengan file ini: mengurangi darah, menandai kalah, dan memulai
+// animasi mati. Penjelasan lengkapnya ada di sini; file mereka hanya memuat
+// bagian yang berbeda.
 import { drawSprite, frameForClip, spriteReady } from '../utils/assets.js';
 
 let enemyIdCounter = 0;
@@ -12,6 +22,8 @@ const ATTACK_HIT_TIME = 5 / ATTACK_FPS;             // 0.5s
 const ATTACK_HIT_RANGE = 26; // jangkauan sabetan saat momen damage
 
 export class Enemy {
+  // x, y = tempat muncul; hp = darah; damage = kekuatan pukulan;
+  // speed = kecepatan gerak.
   constructor(x, y, hp, damage, speed) {
     this.id = enemyIdCounter++;
     this.x = x;
@@ -36,6 +48,10 @@ export class Enemy {
     this.hitThisCycle = false; // sudah menyerang di siklus animasi ini?
   }
 
+  /**
+   * Dijalankan tiap frame: mengejar player, lalu memukul saat sudah dekat.
+   * target = player, obstacles = daftar pohon/batu penghalang.
+   */
   update(dt, target, elapsedTime, obstacles) {
     if (this.dying) {
       this.deathTime += dt;
@@ -90,6 +106,7 @@ export class Enemy {
     this.y = nextY;
   }
 
+  /** Kurangi darah + tampilkan kedipan putih sebentar sebagai tanda kena. */
   takeDamage(amount, elapsedTime) {
     if (this.dying) return;
     this.hp -= amount;
@@ -97,19 +114,20 @@ export class Enemy {
     if (this.hp <= 0) this.hp = 0;
   }
 
-  // Enemy dianggap "kalah" kalau hp habis. Death animation berjalan sebelum
-  // benar-benar dihapus dari game (lihat isGone()).
+  /** Menandakan darah sudah habis (animasi mati tetap diputar dulu). */
   get defeated() {
     return this.hp <= 0;
   }
 
-  // Bisa ditembak player (auto-aim) kalau masih hidup.
+  /** Masih bisa jadi sasaran tembakan player selama belum mati. */
   get isTargetable() {
     return !this.dying;
   }
 
-  // Dipanggil game.js tiap frame: apakah sabetan mengenai player SEKARANG?
-  // Sinkron dengan momen ayunan senjata di animasi (sekali per siklus).
+  /**
+   * Cek apakah pukulan mengenai player saat ini. Hanya melukai sekali tiap
+   * gerakan serang, tepat di saat ayunan senjatanya.
+   */
   shouldDealDamage(player) {
     if (!this.attacking || this.dying || this.hitThisCycle) return false;
     if (this.attackTime < ATTACK_HIT_TIME) return false;
@@ -118,7 +136,7 @@ export class Enemy {
     return dist < ATTACK_HIT_RANGE;
   }
 
-  // Mulai animasi kematian. game.js memanggil ini saat hp habis.
+  /** Mulai animasi mati (dipanggil saat darah habis). */
   startDeath() {
     if (!this.dying) {
       this.dying = true;
@@ -126,14 +144,14 @@ export class Enemy {
     }
   }
 
-  // Kalau pakai sprite death: hapus setelah animasi selesai. Kalau tidak ada
-  // sprite death (fallback), langsung hapus begitu defeated.
+  /** Sudah boleh dihapus dari game (animasi matinya sudah selesai). */
   isGone() {
     if (!this.dying) return false;
     if (!spriteReady('enemyDeath')) return true;
     return this.deathTime >= 0.9; // 9 frame @ 10fps
   }
 
+  /** Gambar musuh sesuai keadaannya (jalan/nyerang/mati) + bar darah kecil. */
   draw(ctx, elapsedTime) {
     const flashing = elapsedTime < this.hitFlashUntil;
     const mirror = this.facingDir > 0;

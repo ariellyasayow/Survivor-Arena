@@ -1,134 +1,109 @@
 # Survivor Arena
 
-Top-down survival arena: kumpulkan poin sampai target tiap level terpenuhi
-sebelum waktu habis, hindari & hajar musuh yang datang bertahap. 3 level,
-level terakhir jadi malam dengan jangkauan pandang terbatas (senter).
+Survivor Arena adalah game arena bertahan hidup dengan sudut pandang dari atas (top-down). Kamu berperan sebagai satu karakter yang dikepung musuh dari segala arah, bertugas mengumpulkan poin sambil bertahan sampai waktu habis. Yang bikin seru: karaktermu menembak sendiri ke musuh terdekat, jadi kamu tinggal fokus bergerak, menghindar, dan mengatur posisi — cocok dimainkan santai di HP dengan satu jempol.
 
-Static HTML + CSS + JavaScript murni — **tanpa backend, tanpa build step,
-tanpa dependency**. Semua logic jalan di browser (Canvas 2D), state disimpan
-lewat `localStorage`.
+---
 
-## Cara menjalankan
+## Fitur Utama
 
-1. Buka folder ini di VS Code.
-2. Install extension **Live Server** (kalau belum).
-3. Klik kanan `index.html` → **Open with Live Server**.
+- **Tembak otomatis** — karakter membidik musuh terdekat sendiri, pemain cukup fokus bergerak dan menghindar.
+- **Joystick mengikuti jari** — kontrol gerak muncul persis di titik pertama jari menyentuh layar, jadi nyaman dipegang di posisi mana pun.
+- **3 level dengan tingkat kesulitan naik** — musuh makin banyak dan makin kuat tiap level; level terakhir gelap dan pandangan terbatas seperti pakai senter.
+- **3 jenis musuh berbeda** — pengejar jarak dekat, peledak nekat, dan penembak laser jarak jauh.
+- **Beragam power-up** — tambah nyawa, tembakan lebih sakit, lari lebih cepat, tembakan menyebar (shotgun), dan tembakan super cepat.
+- **Peta kecil (minimap)** — menampilkan posisi musuh, koin, dan power-up di sekitarmu.
+- **Panduan bawaan** — tutorial "Cara Main" muncul otomatis di awal dan bisa dibuka lagi kapan saja.
+- **Ringan & mandiri** — jalan langsung di browser HP tanpa perlu instalasi berat atau koneksi terus-menerus.
 
-Wajib lewat Live Server (atau server lokal lain, mis. `python -m http.server`),
-tidak bisa dibuka langsung dari file explorer, karena game ini pakai ES
-Modules (`import`/`export`) yang diblokir browser kalau diakses lewat `file://`.
+---
 
-Untuk tes di HP lewat WiFi: jalankan server dengan `--bind 0.0.0.0`, lalu akses
-`http://<ip-lokal-laptop>:<port>` dari HP (harus satu jaringan WiFi yang sama).
+## Cara Bermain
 
-## Gameplay
+### Tujuan
+Kumpulkan koin sampai memenuhi target poin di tiap level sebelum waktu habis. Selesaikan ketiga level untuk menang. Kalau nyawa habis atau waktu keburu nol, permainan berakhir.
 
-- **Objektif**: kumpulkan poin (koin) sampai `Target Poin` tiap level
-  terpenuhi sebelum waktu (`timer`) habis. Waktu habis = game over langsung.
-- **Level**: 3 stage, tiap naik level HP musuh naik 35% dan waktu tiap level
-  bertambah 30 detik (Lvl 1: 1:30 → Lvl 2: 2:00 → Lvl 3: 2:30).
-- **Level terakhir (malam)**: layar gelap, hanya area sekitar player yang
-  terlihat (senter/vision radius terbatas).
-- **XP & Level (power level)**: dapat XP dari musuh yang dikalahkan, naik
-  level menambah damage. Ditampilkan sebagai badge lingkaran bernomor di HUD
-  (beda dengan label "Lvl 1/3" yang menunjukkan stage).
-- **Nyawa**: mulai dengan 3 nyawa (maks 5). Kena serangan musuh = kehilangan
-  nyawa; nyawa habis = game over.
-- **Menembak**: otomatis (auto-aim) ke musuh terdekat dalam jangkauan, tidak
-  perlu aim manual.
+### Kontrol (HP / layar sentuh)
 
-### Musuh
-
-| Tipe | Perilaku |
+| Aksi | Cara |
 |---|---|
-| Enemy 1 | Mengejar player, serangan melee jarak dekat |
-| Enemy 2 | Kamikaze cepat, meledak saat dekat player (radius damage) |
-| Enemy 3 | Jarak jauh, menembak laser ke player |
+| Menggerakkan karakter | Sentuh lalu geser (drag) di sisi kiri layar — joystick muncul di titik sentuhmu |
+| Menembak | Otomatis ke musuh terdekat, tidak perlu tombol |
+| Membuka panduan "Cara Main" | Tap tombol **?** di pojok kanan bawah |
+| Mulai / main lagi | Tap tombol **Mulai** (atau **Main lagi** setelah selesai) |
 
-### Power-up (orb, muncul acak di dunia)
+### Aturan yang perlu diketahui
+- **Waktu habis = langsung kalah**, bukan sekadar kehilangan nyawa. Kejar target poin secepatnya.
+- **Tiap naik level, waktu bertambah** (Level 1: 1 menit 30 detik, lalu +30 detik tiap level) — tapi musuh juga makin kuat.
+- **Level terakhir gelap.** Kamu hanya bisa melihat area kecil di sekitar karakter, jadi lebih waspada.
+- **Kumpulkan XP dengan mengalahkan musuh** untuk naik level dan menambah kekuatan tembakan.
+- **Power-up nyawa bersifat permanen** (menambah nyawa), sedangkan power-up lain (shotgun, tembak cepat, damage, kecepatan) hanya bertahan beberapa detik.
 
-| Tipe | Efek |
-|---|---|
-| ❤ Nyawa | +1 nyawa (maks sesuai batas) |
-| ⚔️ Damage | +damage sementara (8 detik) |
-| ⚡ Speed | +kecepatan lari sementara (6 detik) |
-| 🔫 Shotgun | **Permanen** setelah didapat: tembakan jadi menyebar (5 pelet, auto-aim ke musuh terdekat), jangkauan lebih pendek dari peluru biasa |
+---
 
-Semua power-up digambar seragam (orb mengilap berwarna sesuai tipe), kecuali
-nyawa yang tetap pakai sprite hati.
+## Cara Menjalankan
 
-## Kontrol
+Game ini berbentuk aplikasi web ringan, jadi dijalankan lewat browser HP (atau dibungkus ke dalam aplikasi berbasis WebView).
 
-- **Desktop**: WASD / arrow keys untuk gerak.
-- **Mobile**: joystick *floating* — muncul tepat di titik jari pertama
-  menyentuh zona gerak (kiri layar), bukan terkunci di posisi tetap.
-- Tembak selalu otomatis (tidak ada tombol tembak).
+### Kebutuhan perangkat
+- **Android 8.0+** atau **iOS 13+**
+- Browser modern (Chrome, Safari, atau bawaan sistem versi terbaru)
+- Penyimpanan sangat kecil (**di bawah 5 MB**)
+- Koneksi internet hanya untuk memuat pertama kali; setelah itu tidak butuh server
 
-## Tutorial "How to Play"
+### Cara memainkan (untuk pemain)
+1. Buka tautan game yang dibagikan (atau buka lewat aplikasi tempat game ini dipasang) di browser HP.
+2. Tunggu halaman termuat sampai muncul layar "Survivor Arena".
+3. Tap **Mulai**, ikuti panduan "Cara Main", lalu bermain.
 
-Tutorial interaktif (spotlight + tooltip) muncul otomatis sekali di awal
-pemain pertama kali main — menyorot HP, Level, Target/Waktu, XP, Minimap,
-lalu diakhiri tutorial gerakan (swipe). Status "sudah pernah lihat" disimpan
-di `localStorage`, bisa dipanggil ulang kapan saja lewat tombol **"?"** di
-pojok kanan bawah layar.
+### Menjalankan dari source (untuk developer)
+Proyek ini murni file statis, jadi cukup dilayani lewat server sederhana lalu diakses dari HP dalam jaringan WiFi yang sama:
 
-## Performa
+```bash
+# Masuk ke folder proyek
+cd game-app-project
 
-- Adaptive quality: FPS dipantau tiap frame, otomatis turunkan jumlah
-  partikel kalau device kesulitan mempertahankan frame rate.
-- DPR (device pixel ratio) di-cap untuk device layar sangat rapat.
-- Sprite gambar bersifat opsional — kalau file belum ada di
-  `assets/spritesheets/`, entity otomatis fallback ke bentuk primitif Canvas
-  (game tetap jalan normal).
-- Suara (SFX) di-generate langsung lewat Web Audio API (oscillator/synth),
-  tidak ada file audio yang perlu di-load.
+# Jalankan server statis (butuh Python)
+python -m http.server 8000 --bind 0.0.0.0
 
-## Struktur folder
+
+## Struktur Folder Project
 
 ```
-index.html              entry point + HUD + overlay intro/tutorial
-style.css                styling HUD, overlay, joystick, tutorial
-js/
-  main.js                bootstrap, input (keyboard + joystick), game loop
-  game.js                state utama, CONFIG (semua angka balancing), minimap
-  tutorial.js             tutorial interaktif "How to Play" (spotlight+tooltip)
-  viewport.js              skala layar, kamera, letterbox
-  config.js                konstanta performa & layout (viewport, minimap, dll)
-  quality.js               level kualitas render (adaptive)
-  entities/
-    player.js              player: gerak, damage, buff, shotgun
-    enemy.js                enemy 1: melee chaser
-    enemy2.js               enemy 2: kamikaze/exploder
-    enemy3.js                enemy 3: ranged laser
-    projectile.js            peluru (player + laser enemy3)
-    projectilePool.js        object pool untuk projectile
-  objects/
-    point.js                collectible poin (koin)
-    powerup.js               pickup power-up (orb seragam + hati)
-  ui/
-    hud.js                  update elemen HUD di DOM (nyawa, level, xp, buff)
-  effects/
-    vfx.js                  partikel & floating text
-    sfx.js                  suara sintesis (Web Audio, tanpa file audio)
-    powerup-effects.js       efek tiap power-up
-  world/
-    background.js            ground, pohon, batu (siang/malam), obstacle
-  utils/
-    helpers.js               collision, random, format waktu, math umum
-    assets.js                loader sprite + fallback otomatis + helper animasi
-  debug/
-    fpsMeter.js               FPS meter kecil buat tes performa di device
-assets/
-  spritesheets/             sprite WebP yang benar-benar dipakai game (kecil)
-  assets-image/             source mentah (gitignored, tidak dipakai runtime)
-tools/
-  build_assets.py           script olah assets-image/ -> spritesheets/ (gitignored, dev-only)
+game-app-project/
+├─ index.html          # Halaman utama + tampilan info & tutorial
+├─ style.css           # Gaya tampilan: HUD, tombol, joystick, tutorial
+├─ js/                 # Semua kode game
+│  ├─ main.js          # Titik awal: kontrol pemain & perulangan game
+│  ├─ game.js          # Pusat kendali: aturan, spawn, tembak, level
+│  ├─ tutorial.js      # Panduan interaktif "Cara Main"
+│  ├─ entities/        # Karakter: player, musuh 1/2/3, peluru
+│  ├─ objects/         # Item: koin & power-up
+│  ├─ effects/         # Suara dan efek visual (percikan, teks melayang)
+│  ├─ ui/              # Info di layar (nyawa, skor, level, waktu)
+│  ├─ world/           # Latar: rumput, pohon, batu
+│  └─ utils/           # Fungsi bantu & pemuat gambar
+└─ assets/
+   └─ spritesheets/    # Gambar karakter & item
 ```
 
-## Catatan publish
+Penjelasan folder utama:
+- **`js/entities/`** — semua yang "hidup" dan bergerak: player, tiga jenis musuh, dan peluru.
+- **`js/objects/`** — benda yang bisa diambil: koin dan power-up.
+- **`js/effects/`** — pemanis: suara dan efek visual.
+- **`js/ui/`** — tampilan angka & info di atas layar.
+- **`js/world/`** — latar tempat bermain.
+- **`js/utils/`** — kumpulan fungsi pembantu dan pengatur gambar yang dipakai banyak file.
+- **`assets/spritesheets/`** — file gambar karakter dan item. Bersifat opsional: sebelum gambar dimuat, game menampilkan bentuk sederhana sebagai gantinya.
 
-Proyek ini murni static client-only (tanpa backend/SSR/Vercel) — bisa
-langsung di-host di hosting statis apa pun (GitHub Pages, Netlify, Cloudflare
-Pages, itch.io, dsb). Saat deploy/hand-off, cukup ikutkan `index.html`,
-`style.css`, `js/`, dan `assets/spritesheets/` — folder `assets/assets-image/`
-dan `tools/` tidak dibutuhkan saat runtime.
+---
+
+## Tech Stack
+
+- **Engine/Framework:** tidak memakai engine game — dibangun langsung di atas **Canvas 2D** bawaan browser (murni tanpa framework).
+- **Bahasa utama:** **JavaScript** (ES Modules), dengan **HTML** dan **CSS** untuk halaman dan tampilan.
+- **Tools & library tambahan:**
+  - **Web Audio API** — membuat semua efek suara langsung dari kode (tanpa file audio).
+  - **localStorage** — mengingat apakah pemain sudah melihat tutorial.
+  - **Python + Pillow** — hanya dipakai developer untuk mengolah gambar mentah menjadi file gambar game (opsional, tidak ikut saat game berjalan).
+
+Tidak ada library eksternal, tidak ada proses build, dan tidak butuh server backend — seluruh game berjalan di sisi pemain.

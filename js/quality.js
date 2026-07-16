@@ -1,32 +1,23 @@
 // =============================================
-//  quality.js — Status level kualitas render
+//  quality.js — Pengatur tingkat kualitas gambar
 // =============================================
-//
-// File ini HANYA menyimpan & membaca status kualitas render aktif — tidak
-// tahu-menahu cara menentukannya. Level dipakai di titik-titik render yang
-// "mahal" untuk di-skip/dikurangi di device kurang mumpuni, contoh:
-//   - game.js   -> skip efek glow gradient saat level malam
-//   - vfx.js    -> kurangi jumlah partikel maksimal
-//
-// Siapa yang MENENTUKAN nilainya? main.js, lewat detectDeviceQuality() —
-// dicek SEKALI di awal berdasarkan kemampuan device (jumlah core CPU, RAM
-// kalau tersedia), bukan dipantau terus-menerus lewat FPS real-time seperti
-// versi sebelumnya. Jadi level ini tetap sama sepanjang sesi bermain.
+// Cuma menyimpan satu keterangan: kualitas gambar sekarang tinggi, sedang, atau
+// rendah. Nilainya diisi main.js saat game dibuka (menyesuaikan kekuatan HP),
+// lalu dibaca file lain untuk memutuskan apakah efek berat perlu dikurangi.
 
-/** @type {'high' | 'medium' | 'low'} */
 let currentQuality = 'high';
 
-/** Set level kualitas render aktif. Dipanggil dari main.js saat startup. */
+/** Ganti tingkat kualitas gambar. */
 export function setRenderQuality(level) {
   currentQuality = level;
 }
 
-/** Ambil level kualitas render aktif saat ini ('high' | 'medium' | 'low'). */
+/** Lihat tingkat kualitas gambar sekarang. */
 export function getRenderQuality() {
   return currentQuality;
 }
 
-/** True kalau device sedang di level kualitas terendah (skip efek mahal). */
+/** Cek apakah sedang di kualitas paling rendah (biar efek berat dilewati). */
 export function isLowQuality() {
   return currentQuality === 'low';
 }

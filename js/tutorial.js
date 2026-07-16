@@ -1,9 +1,9 @@
 // =============================================
-//  tutorial.js — Tutorial interaktif "How to Play"
+//  tutorial.js — Panduan "Cara Main"
 // =============================================
-// Spotlight + tooltip murni DOM/CSS (tanpa gambar canvas tambahan, tanpa
-// kerja per-frame di luar 1 pengecekan boolean di game loop). Muncul sekali
-// otomatis saat pertama kali main, atau kapan saja lewat tombol "?".
+// Menyorot bagian-bagian tampilan satu per satu sambil menampilkan penjelasan
+// singkat, lalu diakhiri latihan gerak. Muncul otomatis sekali saat pertama
+// kali main, dan bisa dibuka lagi kapan saja lewat tombol "?".
 
 import { viewport } from './viewport.js';
 import { VIEWPORT_W, MINIMAP_W, MINIMAP_H, MINIMAP_MARGIN } from './config.js';
@@ -26,14 +26,15 @@ let canvasRef = null;
 let active = false;
 let stepIndex = 0;
 
+/** Cari letak & ukuran sebuah bagian tampilan di layar. */
 function rectOf(el) {
   if (!el) return null;
   const r = el.getBoundingClientRect();
   return { left: r.left, top: r.top, width: r.width, height: r.height };
 }
 
-// Minimap digambar di canvas (bukan elemen DOM), jadi rect layar-nya dihitung
-// manual dari posisi logisnya + transform viewport (scale/offset/dpr) saat ini.
+// Peta kecil digambar langsung di game (bukan tulisan HTML), jadi letaknya di
+// layar dihitung sendiri dari posisi & skala tampilan saat ini.
 function getMinimapRect() {
   if (!canvasRef) return null;
   const canvasRect = canvasRef.getBoundingClientRect();
@@ -80,6 +81,7 @@ const STEPS = [
   },
 ];
 
+/** Pindahkan lingkaran sorotan supaya pas menutupi bagian yang dijelaskan. */
 function applySpotlight(rect) {
   const pad = 10;
   const w = rect.width + pad * 2;
@@ -91,6 +93,7 @@ function applySpotlight(rect) {
   spotlightEl.style.borderRadius = h < 40 ? '999px' : '14px';
 }
 
+/** Taruh kotak penjelasan di atas/bawah bagian yang disorot, jangan sampai keluar layar. */
 function positionTooltip(rect) {
   const pad = 10;
   const margin = 14;
@@ -117,6 +120,11 @@ function positionTooltip(rect) {
   tooltipEl.style.top = `${top}px`;
 }
 
+/**
+ * Pindah ke langkah tutorial tertentu: sorot bagiannya & tampilkan
+ * penjelasannya. Pada langkah terakhir, yang ditampilkan adalah latihan gerak.
+ * Kalau bagian yang mau disorot belum siap, langkahnya dilewati.
+ */
 function goToStep(idx) {
   if (idx >= STEPS.length) { finish(); return; }
   stepIndex = idx;
@@ -138,7 +146,7 @@ function goToStep(idx) {
 
   const rect = step.getRect();
   if (!rect || rect.width < 2 || rect.height < 2) {
-    // Elemen target tidak siap/terlihat — lewati langkah ini secara halus.
+    // Bagian yang mau disorot belum ada — langsung lanjut ke langkah berikutnya.
     goToStep(idx + 1);
     return;
   }
@@ -146,17 +154,19 @@ function goToStep(idx) {
   textEl.textContent = step.text;
   applySpotlight(rect);
   spotlightEl.classList.add('show');
-  // Posisikan tooltip setelah teks & layout ter-update (butuh offsetWidth/Height akurat).
+  // Atur posisi kotak penjelasan setelah teksnya terisi (biar ukurannya pas).
   requestAnimationFrame(() => {
     positionTooltip(rect);
     tooltipEl.classList.add('show');
   });
 }
 
+/** Lanjut ke langkah berikutnya (tombol "Lanjut"). */
 function next() {
   goToStep(stepIndex + 1);
 }
 
+/** Tutup tutorial & ingat bahwa pemain sudah pernah melihatnya. */
 function finish() {
   if (!active) return;
   active = false;
@@ -172,6 +182,7 @@ function finish() {
   }, 360);
 }
 
+/** Mulai tutorial dari awal (force = true untuk memaksa tampil lagi). */
 function start({ force = false } = {}) {
   if (active) return;
   if (!force && localStorage.getItem(SEEN_KEY)) return;
@@ -180,6 +191,7 @@ function start({ force = false } = {}) {
   goToStep(0);
 }
 
+/** Siapkan tombol-tombol tutorial & atur agar muncul sendiri saat game dimulai. */
 export function initTutorial(canvas) {
   canvasRef = canvas;
 
@@ -188,15 +200,12 @@ export function initTutorial(canvas) {
   skipSwipeBtn.addEventListener('click', finish);
   howtoBtn.addEventListener('click', () => start({ force: true }));
 
-  // Tampilkan otomatis begitu pemain pertama kali menekan "Mulai" (overlay
-  // utama disembunyikan). Observer sekali-pakai, jauh lebih murah daripada
-  // polling tiap frame; hanya dipasang sekali per sesi halaman.
+  // Tampilkan otomatis begitu pemain menekan "Mulai" (layar pembuka hilang).
+  // Diberi jeda sedikit supaya info di layar sempat tampil sebelum disorot.
   if (mainOverlayEl) {
     const obs = new MutationObserver(() => {
       if (mainOverlayEl.classList.contains('hidden')) {
         obs.disconnect();
-        // Beri jeda singkat supaya HUD sempat ter-render sekali (nyawa, dsb)
-        // sebelum spotlight menyorotnya, dan transisinya terasa lebih halus.
         setTimeout(() => start(), 150);
       }
     });
@@ -204,21 +213,18 @@ export function initTutorial(canvas) {
   }
 }
 
-// Dipanggil main.js tiap frame dengan vektor input saat ini. Early-return
-// murah saat tidak relevan — biaya nol selama bukan langkah gerakan aktif.
+/** Dipanggil tiap frame; saat langkah latihan gerak, tutorial selesai begitu player bergerak. */
 export function notifyInput(x, y) {
   if (!active || STEPS[stepIndex].id !== 'movement') return;
   if (Math.abs(x) > 0.05 || Math.abs(y) > 0.05) finish();
 }
 
-// Gameplay (game.update) dijeda selama langkah HUD (1-5) supaya pemain bisa
-// fokus baca tooltip tanpa diserang; dilepas begitu masuk langkah gerakan.
+/** Apakah game sedang dijeda oleh tutorial (biar pemain bisa membaca dengan tenang). */
 export function isBlockingGameplay() {
   return active && STEPS[stepIndex].id !== 'movement';
 }
 
-// Dipanggil main.js setelah resize/orientasi berubah, supaya spotlight &
-// tooltip tetap presisi menempel ke elemen targetnya.
+/** Sesuaikan lagi posisi sorotan & penjelasan setelah ukuran layar berubah. */
 export function reposition() {
   if (!active) return;
   const step = STEPS[stepIndex];
