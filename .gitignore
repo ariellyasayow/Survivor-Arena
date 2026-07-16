@@ -1,9 +1,0 @@
-node_modules/
-.DS_Store
-*.log
-.vscode/*
-!.vscode/extensions.json
-assets/assets-image/
-tools/
-drop_n_dash/
-.claude
