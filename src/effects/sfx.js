@@ -8,16 +8,34 @@
 import { AUDIO_THROTTLE_MS } from '../config.js';
 
 let ctx = null;
+let audioUnavailable = false; // sekali gagal, jangan coba-coba lagi tiap tembakan
 
-/** Siapkan mesin suara (dibuat sekali, lalu dipakai terus). */
+/**
+ * Siapkan mesin suara (dibuat sekali, lalu dipakai terus).
+ * Mengembalikan null kalau perangkat/WebView tidak menyediakan audio — pemanggil
+ * wajib mengecek. Kegagalan di sini tidak boleh melempar: suara dipanggil dari
+ * dalam game loop, jadi error-nya akan ikut menjatuhkan seluruh game.
+ */
 function ensureContext() {
-  if (!ctx) {
-    ctx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioUnavailable) return null;
+
+  try {
+    if (!ctx) {
+      const AudioCtor = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtor) throw new Error('Web Audio tidak ada');
+      ctx = new AudioCtor();
+    }
+    if (ctx.state === 'suspended') {
+      // Bisa ditolak oleh aturan autoplay; bukan masalah, sentuhan berikutnya
+      // akan mencoba lagi.
+      Promise.resolve(ctx.resume()).catch(() => {});
+    }
+    return ctx;
+  } catch (err) {
+    audioUnavailable = true;
+    console.warn('Audio tidak tersedia; game lanjut tanpa suara:', err);
+    return null;
   }
-  if (ctx.state === 'suspended') {
-    ctx.resume();
-  }
-  return ctx;
 }
 
 /**
@@ -35,6 +53,7 @@ export function unlockAudio() {
  */
 function tone(freq, duration, type = 'sine', volume = 0.2, delay = 0) {
   const audio = ensureContext();
+  if (!audio) return;
   const osc = audio.createOscillator();
   const gain = audio.createGain();
   osc.type = type;
@@ -55,6 +74,7 @@ function tone(freq, duration, type = 'sine', volume = 0.2, delay = 0) {
  */
 function sweep(freqFrom, freqTo, duration, type = 'sawtooth', volume = 0.2, delay = 0) {
   const audio = ensureContext();
+  if (!audio) return;
   const osc = audio.createOscillator();
   const gain = audio.createGain();
   osc.type = type;
@@ -76,6 +96,7 @@ function sweep(freqFrom, freqTo, duration, type = 'sawtooth', volume = 0.2, dela
  */
 function noiseBurst(duration, { volume = 0.3, filterFreq = 800, filterFreqEnd = 80, delay = 0 } = {}) {
   const audio = ensureContext();
+  if (!audio) return;
   const startTime = audio.currentTime + delay;
   const sampleCount = Math.ceil(audio.sampleRate * duration);
   const buffer = audio.createBuffer(1, sampleCount, audio.sampleRate);
@@ -105,18 +126,18 @@ function noiseBurst(duration, { volume = 0.3, filterFreq = 800, filterFreqEnd = 
 }
 
 // Catatan kapan tiap suara terakhir dibunyikan.
-const _lastPlay = {};
+const lastPlayedAt = {};
 
 /**
  * Bungkus sebuah suara supaya tidak bisa berbunyi terlalu sering beruntun
  * (biar tidak berisik saat, misalnya, menembak sangat cepat).
  */
-function throttled(name, fn) {
+function throttled(name, playSound) {
   return () => {
     const now = performance.now();
-    if (_lastPlay[name] && now - _lastPlay[name] < AUDIO_THROTTLE_MS) return;
-    _lastPlay[name] = now;
-    fn();
+    if (lastPlayedAt[name] && now - lastPlayedAt[name] < AUDIO_THROTTLE_MS) return;
+    lastPlayedAt[name] = now;
+    playSound();
   };
 }
 
@@ -154,18 +175,18 @@ export const sfxGameOver = throttled('gameOver', () => {
   tone(140, 0.3, 'sawtooth', 0.15, 0.3);
 });
 
-// Ledakan enemy2: noise "boom" (low-pass meluruh cepat) + sub-bass thump.
+// Ledakan musuh exploder: noise "boom" (low-pass meluruh cepat) + sub-bass thump.
 export const sfxExplosion = throttled('explosion', () => {
   noiseBurst(0.35, { volume: 0.35, filterFreq: 1400, filterFreqEnd: 60 });
   tone(90, 0.25, 'sine', 0.25);
 });
 
-// Laser enemy3: sweep frekuensi tinggi->rendah cepat, khas tembakan sci-fi.
+// Tembakan musuh laser: sweep frekuensi tinggi->rendah cepat, khas sci-fi.
 export const sfxLaser = throttled('laser', () => {
   sweep(1400, 220, 0.14, 'sawtooth', 0.14);
 });
 
-// Sabetan enemy1: whoosh singkat (sweep pendek + noise halus), saat mulai serang.
+// Sabetan musuh melee: whoosh singkat (sweep pendek + noise halus), saat mulai serang.
 export const sfxSwing = throttled('swing', () => {
   sweep(500, 150, 0.1, 'triangle', 0.1);
   noiseBurst(0.08, { volume: 0.08, filterFreq: 2000, filterFreqEnd: 500 });

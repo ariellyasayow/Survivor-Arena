@@ -1,19 +1,20 @@
 // =============================================
-//  enemy3.js — Musuh 3: penembak laser jarak jauh
+//  enemy-laser.js — Musuh laser: penembak jarak jauh
 // =============================================
 // Musuh yang mendekat sampai player masuk jarak tembak, lalu berhenti dan
 // menembakkan laser secara berkala (diberi jeda biar tidak terlalu sering).
 //
-// Fungsi dasar yang sama dengan musuh 1 (mengurangi darah, menandai kalah,
-// memulai animasi mati) dijelaskan di enemy.js — di sini fokus ke lasernya.
+// Fungsi dasar yang sama dengan musuh melee (mengurangi darah, menandai kalah,
+// memulai animasi mati) dijelaskan di enemy-melee.js — di sini fokus ke
+// lasernya.
 import { drawSprite, frameForClip, spriteReady } from '../utils/assets.js';
 
-let enemy3IdCounter = 0;
+let laserIdCounter = 0;
 
-export class Enemy3 {
-  // Sama seperti musuh 1; damage di sini dipakai untuk lasernya.
+export class LaserEnemy {
+  // Sama seperti musuh melee; damage di sini dipakai untuk lasernya.
   constructor(x, y, hp, damage, speed) {
-    this.id = enemy3IdCounter++;
+    this.id = laserIdCounter++;
     this.x = x;
     this.y = y;
     this.r = 11;
@@ -126,7 +127,7 @@ export class Enemy3 {
     }
   }
 
-  // takeDamage, defeated, isTargetable, startDeath, isGone: sama seperti musuh 1.
+  // takeDamage, defeated, isTargetable, startDeath, isGone: sama seperti musuh melee.
   takeDamage(amount, elapsedTime) {
     if (this.dying) return;
     this.hp -= amount;
@@ -151,7 +152,7 @@ export class Enemy3 {
 
   isGone() {
     if (!this.dying) return false;
-    if (!spriteReady('enemy3Death')) return true;
+    if (!spriteReady('laserDeath')) return true;
     return this.deathTime >= 0.3; // 3 frame @ 10fps
   }
 
@@ -173,14 +174,14 @@ export class Enemy3 {
     const size = this.r * 4.2;
 
     // Pilih klip
-    let clip = 'enemy3Run';
-    let frame = frameForClip('enemy3Run', this.clipTime, 12, 'loop').index;
+    let clip = 'laserRun';
+    let frame = frameForClip('laserRun', this.clipTime, 12, 'loop').index;
     if (this.dying) {
-      clip = 'enemy3Death';
-      frame = frameForClip('enemy3Death', this.deathTime, 10, 'once').index;
+      clip = 'laserDeath';
+      frame = frameForClip('laserDeath', this.deathTime, 10, 'once').index;
     } else if (this.attacking) {
-      clip = 'enemy3Attack';
-      frame = frameForClip('enemy3Attack', this.attackTime, 10, 'loop').index;
+      clip = 'laserAttack';
+      frame = frameForClip('laserAttack', this.attackTime, 10, 'loop').index;
     }
 
     if (spriteReady(clip)) {

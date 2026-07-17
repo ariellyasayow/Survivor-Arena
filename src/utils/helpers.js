@@ -7,18 +7,27 @@
  * Cek apakah dua benda bulat saling bersentuhan. Tiap benda harus punya
  * posisi (x, y) dan jari-jari (r). Dipakai misalnya untuk tahu apakah peluru
  * mengenai musuh, atau player menyentuh koin.
+ *
+ * Namanya circleA/circleB — bukan mis. attacker/target — karena urutannya tidak
+ * berpengaruh: hasilnya sama saja kalau kedua argumen ditukar.
+ *
+ * Sengaja membandingkan jarak KUADRAT (tanpa Math.sqrt): hasilnya identik, dan
+ * fungsi ini dipanggil ribuan kali tiap frame (tiap peluru x tiap musuh).
  */
-export function circleCollide(a, b) {
-  const dx = a.x - b.x;
-  const dy = a.y - b.y;
+export function circleCollide(circleA, circleB) {
+  const dx = circleA.x - circleB.x;
+  const dy = circleA.y - circleB.y;
   const distSq = dx * dx + dy * dy;
-  const minDist = a.r + b.r;
+  const minDist = circleA.r + circleB.r;
   return distSq <= minDist * minDist;
 }
 
-/** Hitung jarak lurus antara dua titik. */
-export function distance(a, b) {
-  return Math.hypot(a.x - b.x, a.y - b.y);
+/**
+ * Hitung jarak lurus antara dua titik. Cukup butuh x & y — tidak seperti
+ * circleCollide, jari-jari tidak dipakai di sini.
+ */
+export function distance(pointA, pointB) {
+  return Math.hypot(pointA.x - pointB.x, pointA.y - pointB.y);
 }
 
 /** Ambil angka acak (boleh pecahan) di antara min dan max. */
@@ -36,9 +45,14 @@ export function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-/** Ambil nilai di antara a dan b, sesuai t (0 = a, 1 = b). Buat gerak halus. */
-export function lerp(a, b, t) {
-  return a + (b - a) * t;
+/**
+ * Ambil nilai di antara dua angka sesuai kemajuan 0..1 (0 = awal, 1 = akhir).
+ * Buat gerak halus. Berbeda dari circleCollide/distance, urutan di sini PENTING:
+ * lerp(0, 10, 0.5) = 5, sedangkan lerp(10, 0, 0.5) juga 5 — tapi lerp(0, 10, 0.2)
+ * = 2 sementara lerp(10, 0, 0.2) = 8.
+ */
+export function lerp(fromValue, toValue, progress) {
+  return fromValue + (toValue - fromValue) * progress;
 }
 
 /** Ubah jumlah detik jadi tulisan waktu "mm:ss" buat tampilan timer. */

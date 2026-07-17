@@ -11,13 +11,13 @@
 import { PARTICLE_POOL_SIZE, MAX_PARTICLES_HIGH } from '../config.js';
 
 // Jenis huruf teks melayang, disimpan sekali biar tidak dihitung ulang terus.
-const F_FLOATING = 'bold 12px sans-serif';
+const FLOATING_TEXT_FONT = 'bold 12px sans-serif';
 
 // Batas jumlah partikel yang boleh aktif bersamaan (diatur sistem kualitas).
-let _maxParticles = MAX_PARTICLES_HIGH;
+let maxParticles = MAX_PARTICLES_HIGH;
 
 /** Atur batas jumlah partikel (dikurangi otomatis di perangkat lemah). */
-export function setMaxParticles(n) { _maxParticles = n; }
+export function setMaxParticles(limit) { maxParticles = limit; }
 
 /** Bikin satu partikel kosong. */
 function makeParticle() {
@@ -45,7 +45,7 @@ let floatingTexts = [];
 
 /** Munculkan satu partikel di posisi tertentu dengan arah, umur, ukuran, warna. */
 function emit(x, y, vx, vy, life, size, color) {
-  if (particles.length >= _maxParticles) return;
+  if (particles.length >= maxParticles) return;
   const p = acquireParticle();
   p.x = x; p.y = y;
   p.vx = vx; p.vy = vy;
@@ -119,7 +119,7 @@ export function drawVFX(ctx) {
   ctx.globalAlpha = 1;
 
   if (floatingTexts.length > 0) {
-    ctx.font = F_FLOATING;
+    ctx.font = FLOATING_TEXT_FONT;
     ctx.textAlign = 'center';
     for (let i = 0; i < floatingTexts.length; i++) {
       const t = floatingTexts[i];

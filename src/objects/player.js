@@ -6,6 +6,7 @@
 import { clamp } from '../utils/helpers.js';
 import { WORLD_W, WORLD_H, OBSTACLES } from '../world/background.js';
 import { drawSprite, frameForClip, spriteReady } from '../utils/assets.js';
+import { DAMAGE_BUFF_BONUS, SPEED_BUFF_BONUS } from '../effects/powerup-effects.js';
 
 export class Player {
   /** Tempatkan player di tengah dunia dengan kemampuan awal. */
@@ -40,15 +41,24 @@ export class Player {
   }
 
   /**
-   * Kekuatan tiap peluru: kekuatan dasar + bonus dari naik level. Saat mode
-   * tembak-cepat aktif, kekuatannya sedikit dikurangi biar tetap seimbang.
+   * Kekuatan tiap peluru: kekuatan dasar + bonus dari naik level + bonus
+   * power-up bila sedang aktif. Saat mode tembak-cepat aktif, kekuatannya
+   * sedikit dikurangi biar tetap seimbang.
    */
   get damage() {
     let currentDamage = this.baseDamage + (this.powerLevel || 0) * 2;
+    if (this.hasDamageBuff(this.currentElapsedTime)) {
+      currentDamage += DAMAGE_BUFF_BONUS;
+    }
     if (this.hasRapidFire(this.currentElapsedTime)) {
       currentDamage = Math.max(1, Math.round(currentDamage * 0.7)); // turun 30%
     }
     return currentDamage;
+  }
+
+  /** Kecepatan lari sekarang: dasar + bonus power-up bila sedang aktif. */
+  speedAt(elapsedTime) {
+    return this.baseSpeed + (this.hasSpeedBuff(elapsedTime) ? SPEED_BUFF_BONUS : 0);
   }
 
   /** Dipanggil tiap kali menembak (peluru tak terbatas, tanpa isi ulang). */
@@ -79,6 +89,16 @@ export class Player {
     return elapsedTime < this.rapidBuffUntil;
   }
 
+  /** Sedang dapat bonus damage ('Peluru Sakit!'). */
+  hasDamageBuff(elapsedTime) {
+    return elapsedTime < this.damageBuffUntil;
+  }
+
+  /** Sedang dapat bonus kecepatan ('Lari Cepat!'). */
+  hasSpeedBuff(elapsedTime) {
+    return elapsedTime < this.speedBuffUntil;
+  }
+
   /** Tiap frame: gerakkan player sesuai arahan, tahan agar tidak menembus pohon/batu. */
   update(dt, input, elapsedTime) {
     this.currentElapsedTime = elapsedTime; // dipakai oleh perhitungan damage di atas
@@ -103,8 +123,9 @@ export class Player {
       dy = 0;
     }
 
-    let nextX = this.x + dx * this.baseSpeed * dt;
-    let nextY = this.y + dy * this.baseSpeed * dt;
+    const speed = this.speedAt(elapsedTime);
+    let nextX = this.x + dx * speed * dt;
+    let nextY = this.y + dy * speed * dt;
 
     // Kalau nabrak pohon/batu, dorong player keluar biar tidak menembusnya.
     for (const o of OBSTACLES) {
@@ -143,7 +164,7 @@ export class Player {
   }
 
   /** Tentukan pose player yang pas sekarang (diam/jalan/nembak/mati). */
-  _activeClip(elapsedTime) {
+  activeClip(elapsedTime) {
     if (this.dead) return 'playerDeath';
     if (elapsedTime < this.firingUntil) return 'playerFiring';
     if (this.moving) return 'playerRun';
@@ -156,7 +177,7 @@ export class Player {
     const size = this.r * 4.2;         // render sedikit lebih besar dari radius fisik
 
     // --- Path sprite ---
-    const clip = this._activeClip(elapsedTime);
+    const clip = this.activeClip(elapsedTime);
     if (spriteReady(clip)) {
       let frame;
       if (clip === 'playerRun') {

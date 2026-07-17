@@ -22,7 +22,7 @@ export class PointItem {
     const frame = frameForClip('coin', elapsedTime, 10, 'loop').index;
     if (drawSprite(ctx, 'coin', this.x, this.y, this.r * 2.6 * pulse, frame)) return;
 
-    // Fallback primitif (dipakai selama sprite belum ada di assets/spritesheets/).
+    // Fallback primitif (dipakai selama sprite belum ada di src/assets/spritesheets/).
     ctx.fillStyle = '#FFC857';
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.r * pulse, 0, Math.PI * 2);

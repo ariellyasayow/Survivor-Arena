@@ -1,5 +1,5 @@
 // =============================================
-//  projectilePool.js — Pengelola peluru
+//  projectile-pool.js — Pengelola peluru
 // =============================================
 // Menampung semua peluru (milik player maupun laser musuh). Supaya ringan,
 // peluru tidak dibuat-buang terus-menerus: kita siapkan stok di awal lalu

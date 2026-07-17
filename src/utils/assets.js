@@ -2,59 +2,48 @@
 //  assets.js — Pemuat & pengatur gambar animasi
 // =============================================
 // Tugasnya memuat gambar karakter/item dan membantu memainkan animasinya.
-//
-// Gambar di sini sifatnya OPSIONAL. Kalau filenya belum ada, game tetap jalan
-// dengan menggambar bentuk sederhana (lingkaran/kotak) sebagai gantinya. Begitu
-// filenya ditaruh di folder yang benar, game otomatis pakai gambar itu — tidak
-// perlu ubah kode lain.
-//
-// Satu file gambar berisi banyak "frame" (pose) yang dijejer ke kanan. Dengan
-// mengganti frame yang ditampilkan secara berurutan, gambar jadi seperti
-// bergerak (animasi). Semua karakter digambar menghadap kiri; untuk menghadap
-// kanan tinggal dibalik saat menggambar.
-//
-// Lokasi file: assets/spritesheets/<objek>/<animasi>.webp
+
+// Lokasi file: src/assets/spritesheets/<objek>/<animasi>.webp
 
 // Daftar semua gambar: src = lokasi file, frames = jumlah pose,
 // fw/fh = lebar & tinggi satu frame (dalam piksel).
 // - fw/fh: ukuran satu frame dalam px
 const SPRITE_MANIFEST = {
   // Player (hadap kiri) — beberapa klip animasi
-  playerIdle: { src: 'assets/spritesheets/player/idle.webp', frames: 1, fw: 64, fh: 64 },
-  playerRun: { src: 'assets/spritesheets/player/run.webp', frames: 4, fw: 64, fh: 64 },
-  playerFiring: { src: 'assets/spritesheets/player/firing.webp', frames: 9, fw: 64, fh: 64 },
-  playerDeath: { src: 'assets/spritesheets/player/death.webp', frames: 9, fw: 64, fh: 64 },
+  playerIdle: { src: 'src/assets/spritesheets/player/idle.webp', frames: 1, fw: 64, fh: 64 },
+  playerRun: { src: 'src/assets/spritesheets/player/run.webp', frames: 4, fw: 64, fh: 64 },
+  playerFiring: { src: 'src/assets/spritesheets/player/firing.webp', frames: 9, fw: 64, fh: 64 },
+  playerDeath: { src: 'src/assets/spritesheets/player/death.webp', frames: 9, fw: 64, fh: 64 },
 
-  // Enemy type 1 (hadap kiri) — melee dengan attack jarak dekat
-  enemyRun: { src: 'assets/spritesheets/enemy1/run.webp', frames: 9, fw: 60, fh: 60 },
-  enemyDeath: { src: 'assets/spritesheets/enemy1/death.webp', frames: 9, fw: 60, fh: 60 },
-  enemyAttack: { src: 'assets/spritesheets/enemy1/attack.webp', frames: 9, fw: 60, fh: 60 },
+  // Musuh melee (hadap kiri) — mengejar lalu memukul dari jarak dekat
+  meleeRun: { src: 'src/assets/spritesheets/enemy/melee/run.webp', frames: 9, fw: 60, fh: 60 },
+  meleeDeath: { src: 'src/assets/spritesheets/enemy/melee/death.webp', frames: 9, fw: 60, fh: 60 },
+  meleeAttack: { src: 'src/assets/spritesheets/enemy/melee/attack.webp', frames: 9, fw: 60, fh: 60 },
 
-  // Enemy type 2 (hadap kiri) — fast kamikaze dengan ledakan
-  enemy2Run: { src: 'assets/spritesheets/enemy2/run.webp', frames: 4, fw: 60, fh: 60 },
-  enemy2Attack: { src: 'assets/spritesheets/enemy2/attack.webp', frames: 9, fw: 60, fh: 60 },
+  // Musuh exploder (hadap kiri) — lari cepat lalu meledak (kamikaze)
+  exploderRun: { src: 'src/assets/spritesheets/enemy/exploder/run.webp', frames: 4, fw: 60, fh: 60 },
+  exploderAttack: { src: 'src/assets/spritesheets/enemy/exploder/attack.webp', frames: 9, fw: 60, fh: 60 },
 
-  // Enemy type 3 (Demon_1) — serangan jarak jauh
-  enemy3Run: { src: 'assets/spritesheets/enemy3/run.webp', frames: 5, fw: 60, fh: 60 },
-  enemy3Attack: { src: 'assets/spritesheets/enemy3/attack.webp', frames: 9, fw: 60, fh: 60 },
-  enemy3Death: { src: 'assets/spritesheets/enemy3/death.webp', frames: 3, fw: 60, fh: 60 },
+  // Musuh laser (Demon_1) — menembak dari jarak jauh
+  laserRun: { src: 'src/assets/spritesheets/enemy/laser/run.webp', frames: 5, fw: 60, fh: 60 },
+  laserAttack: { src: 'src/assets/spritesheets/enemy/laser/attack.webp', frames: 9, fw: 60, fh: 60 },
+  laserDeath: { src: 'src/assets/spritesheets/enemy/laser/death.webp', frames: 3, fw: 60, fh: 60 },
 
   // Item pickup — animasi berputar
-  coin: { src: 'assets/spritesheets/coin/spin.webp', frames: 8, fw: 48, fh: 48 },
-  orb: { src: 'assets/spritesheets/orb/spin.webp', frames: 8, fw: 34, fh: 34 },
-  heart: { src: 'assets/spritesheets/heart/spin.webp', frames: 8, fw: 34, fh: 34 },
+  coin: { src: 'src/assets/spritesheets/coin/spin.webp', frames: 8, fw: 48, fh: 48 },
+  orb: { src: 'src/assets/spritesheets/orb/spin.webp', frames: 8, fw: 34, fh: 34 },
+  heart: { src: 'src/assets/spritesheets/heart/spin.webp', frames: 8, fw: 34, fh: 34 },
 
   // Environment
-  tree: { src: 'assets/spritesheets/tree/tree.webp', frames: 16, fw: 64, fh: 64 },
-  rock: { src: 'assets/spritesheets/rock/rock.webp', frames: 1, fw: 48, fh: 48 },
+  tree: { src: 'src/assets/spritesheets/tree/tree.webp', frames: 16, fw: 64, fh: 64 },
+  rock: { src: 'src/assets/spritesheets/rock/rock.webp', frames: 1, fw: 48, fh: 48 },
 };
 
 // Tempat menyimpan gambar yang sudah dimuat, biar tidak dimuat berulang.
 const sprites = {};
 
 /**
- * Muat satu gambar. Kalau filenya tidak ada, tidak error — gambar cuma ditandai
- * "belum siap" supaya game pakai bentuk sederhana sebagai gantinya.
+ * Muat satu gambar.
  */
 function loadOne(key, def) {
   return new Promise((resolve) => {
@@ -76,8 +65,7 @@ let preloaded = false;
 
 /**
  * Muat semua gambar sekaligus. Dipanggil sekali sebelum game mulai supaya
- * gambar tidak muncul mendadak di tengah permainan. Aman walau belum ada
- * satu pun file gambar.
+ * gambar tidak muncul mendadak di tengah permainan. 
  */
 export async function preloadSprites(onProgress) {
   if (preloaded) return sprites;

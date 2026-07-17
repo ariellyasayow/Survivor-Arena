@@ -4,14 +4,14 @@
 // File utama yang mengatur segalanya: pengaturan angka (CONFIG), keadaan
 // permainan, memunculkan musuh & item, tembak-menembak, cek tabrakan, naik
 // level, dan menggambar semuanya. Dipanggil main.js terus-menerus.
-import { Player } from './entities/player.js';
-import { Enemy } from './entities/enemy.js';
-import { Enemy2 } from './entities/enemy2.js';
-import { Enemy3 } from './entities/enemy3.js';
+import { Player } from './objects/player.js';
+import { MeleeEnemy } from './objects/enemy-melee.js';
+import { ExploderEnemy } from './objects/enemy-exploder.js';
+import { LaserEnemy } from './objects/enemy-laser.js';
 import {
   spawnProjectile, updateProjectiles, drawProjectiles,
   forEachActiveProjectile, clearProjectiles,
-} from './entities/projectilePool.js';
+} from './objects/projectile-pool.js';
 import { PointItem } from './objects/point.js';
 import { PowerUpItem } from './objects/powerup.js';
 import { WORLD_W, WORLD_H, OBSTACLES, drawBackground } from './world/background.js';
@@ -24,6 +24,9 @@ import { spriteReady } from './utils/assets.js';
 import { viewport, camera, updateCamera } from './viewport.js';
 import { VIEWPORT_W, VIEWPORT_H, MINIMAP_W, MINIMAP_H, MINIMAP_MARGIN } from './config.js';
 import { isLowQuality } from './quality.js';
+import {
+  webviewSignalLaunch, webviewSignalStartRound, webviewSignalEndRound, webviewSignalExit,
+} from './MpBridge.js';
 
 // Semua angka pengaturan game dikumpulkan di sini biar gampang diubah.
 export const CONFIG = {
@@ -36,9 +39,9 @@ export const CONFIG = {
   ENEMY_DMG_GROWTH_PER_STAGE: 1,
   ENEMY_SPEED: 55,
   ENEMY_SPAWN_INTERVAL: 1.8,
-  MAX_ENEMY1: 8,
-  MAX_ENEMY2: 3,
-  MAX_ENEMY3: 3,
+  MAX_MELEE_ENEMY: 8,
+  MAX_EXPLODER_ENEMY: 3,
+  MAX_LASER_ENEMY: 3,
   POINT_SPAWN_INTERVAL: 2.2,
   POWERUP_SPAWN_INTERVAL: 9,
   // --- Shotgun power-up (orb merah) ---
@@ -58,35 +61,80 @@ const overlayEl = document.getElementById('overlay');
 const overlayTitleEl = document.getElementById('overlay-title');
 const overlayMessageEl = document.getElementById('overlay-message');
 const overlayButtonEl = document.getElementById('overlay-button');
+const overlayExitEl = document.getElementById('overlay-exit');
 
 export class Game {
   /** Siapkan game, atur ulang ke kondisi awal, & pasang tombol "Mulai". */
   constructor(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
+
+    // Dipakai untuk sinyal ke host WebView (MpBridge). Sengaja di luar reset()
+    // karena harus bertahan saat pemain menekan "Main lagi".
+    this.hasLaunched = false;
+    this.hasExited = false;
+    this.lastWin = false;
+    this.lastScore = 0;
+
+    // Aset belum dimuat. Tombol Mulai ditahan sampai main.js memanggil
+    // markReady() — harus di-set sebelum reset(), yang membacanya.
+    this.ready = false;
+
     this.reset();
 
     if (overlayButtonEl) {
-      overlayButtonEl.onclick = () => {
-        if (this.state === 'ended') {
-          this.reset();
-        }
-        this.state = 'playing';
-        if (overlayEl) overlayEl.classList.add('hidden');
-      };
+      overlayButtonEl.onclick = () => this.startPlaying();
     }
 
     // Event Delegation sebagai pengaman ganda tombol Mulai
     document.addEventListener('click', (e) => {
       if (e.target && (e.target.id === 'overlay-button' || e.target.closest('#overlay-button'))) {
-        if (this.state === 'intro' || this.state === 'ended') {
-          if (this.state === 'ended') this.reset();
-          this.state = 'playing';
-          const el = document.getElementById('overlay');
-          if (el) el.classList.add('hidden');
-        }
+        this.startPlaying();
       }
     });
+
+    if (overlayExitEl) {
+      overlayExitEl.onclick = () => this.exitGame();
+    }
+  }
+
+  /**
+   * Aset selesai dimuat — buka tombol Mulai. Dipanggil sekali dari main.js.
+   */
+  markReady() {
+    this.ready = true;
+    if (overlayButtonEl) {
+      overlayButtonEl.disabled = false;
+      overlayButtonEl.textContent = 'Mulai';
+    }
+  }
+
+  /**
+   * Mulai bermain dari layar intro atau layar hasil. Pengecekan di awal juga
+   * yang membuat tombol Mulai aman ditekan dua kali (lihat pengaman ganda di
+   * constructor): panggilan kedua langsung berhenti di sini.
+   */
+  startPlaying() {
+    if (!this.ready) return; // aset belum siap; game belum bisa menggambar
+    if (this.state !== 'intro' && this.state !== 'ended') return;
+    if (this.state === 'ended') this.reset();
+
+    if (!this.hasLaunched) {
+      this.hasLaunched = true;
+      webviewSignalLaunch();
+    }
+
+    this.state = 'playing';
+    if (overlayEl) overlayEl.classList.add('hidden');
+    webviewSignalStartRound();
+  }
+
+  /** Pemain menekan "Keluar" di panel hasil. Hanya boleh dilaporkan sekali. */
+  exitGame() {
+    if (this.hasExited) return;
+    this.hasExited = true;
+    if (overlayExitEl) overlayExitEl.disabled = true;
+    webviewSignalExit(this.lastWin, this.lastScore);
   }
 
   /** Kembalikan semua ke kondisi awal (saat mulai baru atau main lagi). */
@@ -110,16 +158,16 @@ export class Game {
 
     this.player = new Player();
     this.player.powerLevel = 0;
-    this.enemies = [];
-    this.enemy2s = [];
-    this.enemy3s = [];
+    this.meleeEnemies = [];
+    this.exploderEnemies = [];
+    this.laserEnemies = [];
     clearProjectiles();
     this.points = [];
     this.powerUps = [];
 
-    this.enemySpawnTimer = 0;
-    this.enemy2SpawnTimer = 3.5;
-    this.enemy3SpawnTimer = 5.0;
+    this.meleeSpawnTimer = 0;
+    this.exploderSpawnTimer = 3.5;
+    this.laserSpawnTimer = 5.0;
     this.pointSpawnTimer = 0.5;
     this.powerUpSpawnTimer = CONFIG.POWERUP_SPAWN_INTERVAL;
 
@@ -128,9 +176,12 @@ export class Game {
     if (overlayTitleEl) {
       overlayTitleEl.textContent = 'Survivor Arena';
       overlayMessageEl.textContent = 'Welcome to Survivor Arena!';
-      overlayButtonEl.textContent = 'Mulai';
+      // Selagi aset dimuat, biarkan tombol tetap "Memuat…" (lihat markReady).
+      if (this.ready) overlayButtonEl.textContent = 'Mulai';
       if (overlayEl) overlayEl.classList.remove('hidden');
     }
+    // Keluar hanya ditawarkan di panel hasil, bukan di layar intro.
+    if (overlayExitEl) overlayExitEl.classList.add('hidden');
   }
 
   /** Sedang di level terakhir (malam, pandangan terbatas)? */
@@ -138,34 +189,34 @@ export class Game {
     return this.stageIndex === this.stageCount - 1;
   }
 
-  /** Munculkan musuh 1 dari pinggir; makin tinggi level makin kuat. */
-  spawnEnemy() {
+  /** Munculkan musuh melee dari pinggir; makin tinggi level makin kuat. */
+  spawnMeleeEnemy() {
     const p = randomEdgePoint(WORLD_W, WORLD_H, 16);
     const hp = CONFIG.BASE_ENEMY_HP * Math.pow(CONFIG.ENEMY_HP_GROWTH_PER_STAGE, this.stageIndex);
     const dmg = CONFIG.BASE_ENEMY_DAMAGE + CONFIG.ENEMY_DMG_GROWTH_PER_STAGE * this.stageIndex;
     const speed = CONFIG.ENEMY_SPEED + this.stageIndex * 8;
-    this.enemies.push(new Enemy(p.x, p.y, hp, dmg, speed));
+    this.meleeEnemies.push(new MeleeEnemy(p.x, p.y, hp, dmg, speed));
     sfxMonster();
   }
 
-  /** Munculkan musuh 2 (peledak); darahnya lebih sedikit dari musuh 1. */
-  spawnEnemy2() {
+  /** Munculkan musuh exploder; darahnya lebih sedikit dari musuh melee. */
+  spawnExploderEnemy() {
     const p = randomEdgePoint(WORLD_W, WORLD_H, 16);
     const baseHp = CONFIG.BASE_ENEMY_HP * Math.pow(CONFIG.ENEMY_HP_GROWTH_PER_STAGE, this.stageIndex);
     const hp = baseHp * 0.75;
     const dmg = CONFIG.BASE_ENEMY_DAMAGE + CONFIG.ENEMY_DMG_GROWTH_PER_STAGE * this.stageIndex;
     const speed = CONFIG.ENEMY_SPEED + this.stageIndex * 8;
-    this.enemy2s.push(new Enemy2(p.x, p.y, hp, dmg, speed));
+    this.exploderEnemies.push(new ExploderEnemy(p.x, p.y, hp, dmg, speed));
     sfxMonster();
   }
 
-  /** Munculkan musuh 3 (penembak laser) dari pinggir. */
-  spawnEnemy3() {
+  /** Munculkan musuh laser (penembak jarak jauh) dari pinggir. */
+  spawnLaserEnemy() {
     const p = randomEdgePoint(WORLD_W, WORLD_H, 16);
     const hp = CONFIG.BASE_ENEMY_HP * Math.pow(CONFIG.ENEMY_HP_GROWTH_PER_STAGE, this.stageIndex);
     const dmg = CONFIG.BASE_ENEMY_DAMAGE + CONFIG.ENEMY_DMG_GROWTH_PER_STAGE * this.stageIndex;
     const speed = CONFIG.ENEMY_SPEED + this.stageIndex * 8;
-    this.enemy3s.push(new Enemy3(p.x, p.y, hp, dmg, speed));
+    this.laserEnemies.push(new LaserEnemy(p.x, p.y, hp, dmg, speed));
     sfxMonster();
   }
 
@@ -203,9 +254,9 @@ export class Game {
     this.powerUps.push(new PowerUpItem(x, y, type));
   }
 
-  /** Semua musuh (jenis 1, 2, dan 3) dijadikan satu daftar. */
+  /** Semua musuh (melee, exploder, laser) dijadikan satu daftar. */
   allEnemies() {
-    return [...this.enemies, ...this.enemy2s, ...this.enemy3s];
+    return [...this.meleeEnemies, ...this.exploderEnemies, ...this.laserEnemies];
   }
 
   /** Otomatis bidik musuh terdekat lalu tembak (menyebar saat mode shotgun). */
@@ -215,12 +266,12 @@ export class Game {
     // Cari musuh terdekat sebagai sasaran.
     let nearest = null;
     let nearestDist = Infinity;
-    for (const e of this.allEnemies()) {
-      if (!e.isTargetable) continue;
-      const d = distance(this.player, e);
-      if (d < nearestDist) {
-        nearestDist = d;
-        nearest = e;
+    for (const enemy of this.allEnemies()) {
+      if (!enemy.isTargetable) continue;
+      const distToEnemy = distance(this.player, enemy);
+      if (distToEnemy < nearestDist) {
+        nearestDist = distToEnemy;
+        nearest = enemy;
       }
     }
     if (!nearest) return;
@@ -284,35 +335,35 @@ export class Game {
 
     updateProjectiles(dt);
 
-    for (const e of this.enemies) {
-      const wasAttacking = e.attacking;
-      e.update(dt, this.player, this.elapsedTime, OBSTACLES);
-      if (!wasAttacking && e.attacking) {
+    for (const meleeEnemy of this.meleeEnemies) {
+      const wasAttacking = meleeEnemy.attacking;
+      meleeEnemy.update(dt, this.player, this.elapsedTime, OBSTACLES);
+      if (!wasAttacking && meleeEnemy.attacking) {
         sfxSwing();
       }
     }
-    for (const e2 of this.enemy2s) {
-      e2.update(dt, this.player, this.elapsedTime, OBSTACLES);
-      if (e2.consumeExplosionTrigger()) {
-        spawnHitParticles(e2.x, e2.y, '#FF6B4A', 14);
+    for (const exploderEnemy of this.exploderEnemies) {
+      exploderEnemy.update(dt, this.player, this.elapsedTime, OBSTACLES);
+      if (exploderEnemy.consumeExplosionTrigger()) {
+        spawnHitParticles(exploderEnemy.x, exploderEnemy.y, '#FF6B4A', 14);
         sfxExplosion();
       }
-      if (e2.hitsPlayerNow(this.player)) {
+      if (exploderEnemy.hitsPlayerNow(this.player)) {
         this.onPlayerHit(1, { instantKill: true });
       }
     }
-    for (const e3 of this.enemy3s) {
-      e3.update(dt, this.player, this.elapsedTime, OBSTACLES);
-      if (e3.shouldFireLaser()) {
-        const dx = this.player.x - e3.x;
-        const dy = this.player.y - e3.y;
+    for (const laserEnemy of this.laserEnemies) {
+      laserEnemy.update(dt, this.player, this.elapsedTime, OBSTACLES);
+      if (laserEnemy.shouldFireLaser()) {
+        const dx = this.player.x - laserEnemy.x;
+        const dy = this.player.y - laserEnemy.y;
         const dist = Math.hypot(dx, dy) || 1;
         const dirX = dx / dist;
         const dirY = dy / dist;
-        const muzzle = e3.r + 8;
-        const sx = e3.x + dirX * muzzle;
-        const sy = e3.y + dirY * muzzle;
-        const laser = spawnProjectile(sx, sy, dirX, dirY, e3.attackRange, e3.damage, true);
+        const muzzle = laserEnemy.r + 8;
+        const sx = laserEnemy.x + dirX * muzzle;
+        const sy = laserEnemy.y + dirY * muzzle;
+        const laser = spawnProjectile(sx, sy, dirX, dirY, laserEnemy.attackRange, laserEnemy.damage, true);
         laser.isLaser = true;
         sfxLaser();
       }
@@ -320,56 +371,56 @@ export class Game {
 
     forEachActiveProjectile((proj) => {
       if (proj.isEnemy) return;
-      for (const e of this.enemies) {
-        if (e.dying) continue;
-        if (circleCollide(proj, e)) {
-          e.takeDamage(proj.damage, this.elapsedTime);
+      for (const meleeEnemy of this.meleeEnemies) {
+        if (meleeEnemy.dying) continue;
+        if (circleCollide(proj, meleeEnemy)) {
+          meleeEnemy.takeDamage(proj.damage, this.elapsedTime);
           proj.dead = true;
-          spawnHitParticles(e.x, e.y, '#7B3FE4', 6);
+          spawnHitParticles(meleeEnemy.x, meleeEnemy.y, '#7B3FE4', 6);
           sfxHit();
-          if (e.defeated) {
-            e.startDeath();
-            this.onEnemyKilled(e);
+          if (meleeEnemy.defeated) {
+            meleeEnemy.startDeath();
+            this.onEnemyKilled(meleeEnemy);
           }
           break;
         }
       }
-      for (const e2 of this.enemy2s) {
-        if (e2.dying || e2.attacking) continue;
-        if (circleCollide(proj, e2)) {
-          e2.takeDamage(proj.damage, this.elapsedTime);
+      for (const exploderEnemy of this.exploderEnemies) {
+        if (exploderEnemy.dying || exploderEnemy.attacking) continue;
+        if (circleCollide(proj, exploderEnemy)) {
+          exploderEnemy.takeDamage(proj.damage, this.elapsedTime);
           proj.dead = true;
-          spawnHitParticles(e2.x, e2.y, '#FF6B4A', 6);
+          spawnHitParticles(exploderEnemy.x, exploderEnemy.y, '#FF6B4A', 6);
           sfxHit();
-          if (e2.defeated) {
-            e2.startDeath();
-            this.onEnemyKilled(e2);
+          if (exploderEnemy.defeated) {
+            exploderEnemy.startDeath();
+            this.onEnemyKilled(exploderEnemy);
           }
           break;
         }
       }
-      for (const e3 of this.enemy3s) {
-        if (e3.dying) continue;
-        if (circleCollide(proj, e3)) {
-          e3.takeDamage(proj.damage, this.elapsedTime);
+      for (const laserEnemy of this.laserEnemies) {
+        if (laserEnemy.dying) continue;
+        if (circleCollide(proj, laserEnemy)) {
+          laserEnemy.takeDamage(proj.damage, this.elapsedTime);
           proj.dead = true;
-          spawnHitParticles(e3.x, e3.y, '#4A90E2', 6);
+          spawnHitParticles(laserEnemy.x, laserEnemy.y, '#4A90E2', 6);
           sfxHit();
-          if (e3.defeated) {
-            e3.startDeath();
-            this.onEnemyKilled(e3);
+          if (laserEnemy.defeated) {
+            laserEnemy.startDeath();
+            this.onEnemyKilled(laserEnemy);
           }
           break;
         }
       }
     });
 
-    this.enemies = this.enemies.filter((e) => !e.isGone());
-    this.enemy2s = this.enemy2s.filter((e2) => !e2.isGone());
-    this.enemy3s = this.enemy3s.filter((e3) => !e3.isGone());
+    this.meleeEnemies = this.meleeEnemies.filter((meleeEnemy) => !meleeEnemy.isGone());
+    this.exploderEnemies = this.exploderEnemies.filter((exploderEnemy) => !exploderEnemy.isGone());
+    this.laserEnemies = this.laserEnemies.filter((laserEnemy) => !laserEnemy.isGone());
 
-    for (const e of this.enemies) {
-      if (e.shouldDealDamage(this.player)) {
+    for (const meleeEnemy of this.meleeEnemies) {
+      if (meleeEnemy.shouldDealDamage(this.player)) {
         this.onPlayerHit(1);
       }
     }
@@ -412,28 +463,28 @@ export class Game {
     }
     this.powerUps = this.powerUps.filter((p) => !p.collected);
 
-    const alive = (arr) => arr.filter((e) => !e.dying).length;
+    const alive = (enemyList) => enemyList.filter((enemy) => !enemy.dying).length;
 
     // --- SPAWN MUSUH BERTAHAP ---
-    this.enemySpawnTimer -= dt;
-    if (this.enemySpawnTimer <= 0) {
-      if (alive(this.enemies) < CONFIG.MAX_ENEMY1) this.spawnEnemy();
-      this.enemySpawnTimer = CONFIG.ENEMY_SPAWN_INTERVAL;
+    this.meleeSpawnTimer -= dt;
+    if (this.meleeSpawnTimer <= 0) {
+      if (alive(this.meleeEnemies) < CONFIG.MAX_MELEE_ENEMY) this.spawnMeleeEnemy();
+      this.meleeSpawnTimer = CONFIG.ENEMY_SPAWN_INTERVAL;
     }
 
     if (this.stageIndex >= 1) {
-      this.enemy3SpawnTimer -= dt;
-      if (this.enemy3SpawnTimer <= 0) {
-        if (alive(this.enemy3s) < CONFIG.MAX_ENEMY3) this.spawnEnemy3();
-        this.enemy3SpawnTimer = CONFIG.ENEMY_SPAWN_INTERVAL * 2.8;
+      this.laserSpawnTimer -= dt;
+      if (this.laserSpawnTimer <= 0) {
+        if (alive(this.laserEnemies) < CONFIG.MAX_LASER_ENEMY) this.spawnLaserEnemy();
+        this.laserSpawnTimer = CONFIG.ENEMY_SPAWN_INTERVAL * 2.8;
       }
     }
 
     if (this.stageIndex >= 2) {
-      this.enemy2SpawnTimer -= dt;
-      if (this.enemy2SpawnTimer <= 0) {
-        if (alive(this.enemy2s) < CONFIG.MAX_ENEMY2) this.spawnEnemy2();
-        this.enemy2SpawnTimer = CONFIG.ENEMY_SPAWN_INTERVAL * 3.5;
+      this.exploderSpawnTimer -= dt;
+      if (this.exploderSpawnTimer <= 0) {
+        if (alive(this.exploderEnemies) < CONFIG.MAX_EXPLODER_ENEMY) this.spawnExploderEnemy();
+        this.exploderSpawnTimer = CONFIG.ENEMY_SPAWN_INTERVAL * 3.5;
       }
     }
 
@@ -523,18 +574,24 @@ export class Game {
   advanceStage() {
     this.stageIndex += 1;
     if (this.stageIndex >= this.stageCount) {
-      this.endGame(true);
+      this.endGame(true); // endGame yang melaporkan berakhirnya level terakhir
       return;
     }
+
+    // Satu level = satu round bagi host WebView: tutup level yang barusan
+    // selesai, lalu buka level baru bersamaan dengan reset state di bawah.
+    webviewSignalEndRound(true, this.score);
+    webviewSignalStartRound();
+
     this.stageScore = 0;
     this.stageTarget = CONFIG.STAGE_TARGET[this.stageIndex];
     this.timeLeft = CONFIG.STAGE_TIME[this.stageIndex];
-    this.enemies = [];
-    this.enemy2s = [];
-    this.enemy3s = [];
+    this.meleeEnemies = [];
+    this.exploderEnemies = [];
+    this.laserEnemies = [];
     clearProjectiles();
-    this.enemy2SpawnTimer = 3.5;
-    this.enemy3SpawnTimer = 5.0;
+    this.exploderSpawnTimer = 3.5;
+    this.laserSpawnTimer = 5.0;
     spawnLevelUpBurst(this.player.x, this.player.y, '#2DE1C7');
     sfxLevelUp();
   }
@@ -543,6 +600,12 @@ export class Game {
   endGame(won) {
     this.state = 'ended';
     sfxGameOver();
+
+    this.lastWin = won;
+    this.lastScore = this.score;
+    webviewSignalEndRound(won, this.score);
+
+    if (overlayExitEl && !this.hasExited) overlayExitEl.classList.remove('hidden');
 
     if (overlayTitleEl) {
       overlayTitleEl.textContent = won ? 'Kamu selamat!' : 'Game over';
@@ -562,8 +625,10 @@ export class Game {
     const ctx = this.ctx;
     const { scale, offsetX, offsetY } = viewport;
 
+    // Canvas kini pas seukuran area main (lihat resizeViewport), jadi cukup satu
+    // isian penuh sebagai dasar — clearRect sebelumnya hanya mengulang kerja
+    // yang sama. Bar hitam di sisa layar sudah jadi latar CSS, bukan digambar.
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     ctx.fillStyle = '#05070f';
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
@@ -576,13 +641,13 @@ export class Game {
 
     ctx.translate(-camera.x, -camera.y);
 
-    drawBackground(ctx, this.isNight);
+    drawBackground(ctx, this.isNight, camera.x, camera.y, VIEWPORT_W, VIEWPORT_H);
 
     for (const pt of this.points) pt.draw(ctx, this.elapsedTime);
     for (const pu of this.powerUps) pu.draw(ctx, this.elapsedTime);
-    for (const e of this.enemies) e.draw(ctx, this.elapsedTime);
-    for (const e2 of this.enemy2s) e2.draw(ctx, this.elapsedTime);
-    for (const e3 of this.enemy3s) e3.draw(ctx, this.elapsedTime);
+    for (const meleeEnemy of this.meleeEnemies) meleeEnemy.draw(ctx, this.elapsedTime);
+    for (const exploderEnemy of this.exploderEnemies) exploderEnemy.draw(ctx, this.elapsedTime);
+    for (const laserEnemy of this.laserEnemies) laserEnemy.draw(ctx, this.elapsedTime);
     drawProjectiles(ctx);
     this.player.draw(ctx, this.elapsedTime);
 
@@ -682,9 +747,9 @@ export class Game {
     }
 
     ctx.fillStyle = '#FF5470';
-    for (const e of this.allEnemies()) {
-      if (e.dying) continue;
-      ctx.fillRect(mapX + e.x * scaleX - 1.5, mapY + e.y * scaleY - 1.5, 3, 3);
+    for (const enemy of this.allEnemies()) {
+      if (enemy.dying) continue;
+      ctx.fillRect(mapX + enemy.x * scaleX - 1.5, mapY + enemy.y * scaleY - 1.5, 3, 3);
     }
 
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';

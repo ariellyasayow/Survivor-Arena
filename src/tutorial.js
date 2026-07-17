@@ -10,6 +10,29 @@ import { VIEWPORT_W, MINIMAP_W, MINIMAP_H, MINIMAP_MARGIN } from './config.js';
 
 const SEEN_KEY = 'survivorArena_tutorialSeen';
 
+/**
+ * localStorage bisa melempar error, bukan cuma kosong: WebView Android
+ * mematikannya secara default, dan storage penuh juga melempar. Kalau error itu
+ * lolos, tutorial gagal menutup diri dan overlay-nya mengunci layar selamanya.
+ * Di sini kegagalan diserap: paling buruk tutorial muncul lagi lain kali.
+ */
+const seenStore = {
+  get() {
+    try {
+      return localStorage.getItem(SEEN_KEY);
+    } catch {
+      return null;
+    }
+  },
+  set() {
+    try {
+      localStorage.setItem(SEEN_KEY, '1');
+    } catch {
+      /* diabaikan sengaja */
+    }
+  },
+};
+
 const overlayEl = document.getElementById('tutorial-overlay');
 const spotlightEl = document.getElementById('tutorial-spotlight');
 const tooltipEl = document.getElementById('tutorial-tooltip');
@@ -170,7 +193,7 @@ function next() {
 function finish() {
   if (!active) return;
   active = false;
-  localStorage.setItem(SEEN_KEY, '1');
+  seenStore.set();
   overlayEl.classList.add('fade-out');
   setTimeout(() => {
     overlayEl.classList.add('hidden');
@@ -185,7 +208,7 @@ function finish() {
 /** Mulai tutorial dari awal (force = true untuk memaksa tampil lagi). */
 function start({ force = false } = {}) {
   if (active) return;
-  if (!force && localStorage.getItem(SEEN_KEY)) return;
+  if (!force && seenStore.get()) return;
   active = true;
   overlayEl.classList.remove('hidden', 'fade-out');
   goToStep(0);

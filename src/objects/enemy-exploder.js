@@ -1,24 +1,25 @@
 // =============================================
-//  enemy2.js — Musuh 2: peledak nekat (kamikaze)
+//  enemy-exploder.js — Musuh exploder: peledak nekat (kamikaze)
 // =============================================
 // Musuh cepat yang mengejar player, dan begitu dekat ia berhenti sebentar
 // (ancang-ancang) lalu MELEDAK. Ledakannya melukai player yang ada di dekatnya.
-// Darahnya lebih sedikit, larinya dua kali lebih cepat dari musuh 1.
+// Darahnya lebih sedikit, larinya dua kali lebih cepat dari musuh melee.
 //
-// Fungsi dasar yang sama dengan musuh 1 (mengurangi darah, menandai kalah,
-// memulai animasi mati) dijelaskan di enemy.js — di sini fokus ke ledakannya.
+// Fungsi dasar yang sama dengan musuh melee (mengurangi darah, menandai kalah,
+// memulai animasi mati) dijelaskan di enemy-melee.js — di sini fokus ke
+// ledakannya.
 import { drawSprite, frameForClip, spriteReady } from '../utils/assets.js';
 
-let enemyIdCounter = 0;
+let exploderIdCounter = 0;
 
 const ATTACK_TRIGGER_DIST = 42; // sedekat apa baru mulai ancang-ancang meledak
 const WINDUP_TIME = 0.5;        // lama ancang-ancang sebelum meledak (detik)
 const EXPLODE_RADIUS = 46;      // seberapa luas ledakan melukai player
 
-export class Enemy2 {
-  // Sama seperti musuh 1; kecepatannya digandakan di dalam.
+export class ExploderEnemy {
+  // Sama seperti musuh melee; kecepatannya digandakan di dalam.
   constructor(x, y, hp, damage, speed) {
-    this.id = enemyIdCounter++;
+    this.id = exploderIdCounter++;
     this.x = x;
     this.y = y;
     this.r = 11;
@@ -101,7 +102,7 @@ export class Enemy2 {
     this.y = nextY;
   }
 
-  /** Seperti musuh 1; tidak mempan saat sudah ancang-ancang meledak. */
+  /** Seperti musuh melee; tidak mempan saat sudah ancang-ancang meledak. */
   takeDamage(amount, elapsedTime) {
     if (this.dying || this.attacking) return;
     this.hp -= amount;
@@ -124,7 +125,7 @@ export class Enemy2 {
     if (!this.dying) {
       this.dying = true;
       this.deathTime = 0;
-      // Enemy2 SELALU meledak saat mati (baik windup selesai maupun kena tembak).
+      // Musuh ini SELALU meledak saat mati (baik windup selesai maupun kena tembak).
       // Radius ledakan aktif sepanjang animasi mati.
       this.explosionActive = true;
       // One-shot flag: game.js consume ini untuk trigger SFX/VFX ledakan TEPAT
@@ -147,7 +148,7 @@ export class Enemy2 {
   /** Sudah boleh dihapus (animasi matinya selesai). */
   isGone() {
     if (!this.dying) return false;
-    if (!spriteReady('enemy2Attack')) return true;
+    if (!spriteReady('exploderAttack')) return true;
     return this.deathTime >= 0.9; // 9 frame @ 10fps
   }
 
@@ -169,14 +170,14 @@ export class Enemy2 {
     const size = this.r * 4.2;
 
     // Pilih klip: run -> attack (windup) -> death (reuse attack sprite).
-    let clip = 'enemy2Run';
-    let frame = frameForClip('enemy2Run', this.clipTime, 12, 'loop').index;
+    let clip = 'exploderRun';
+    let frame = frameForClip('exploderRun', this.clipTime, 12, 'loop').index;
     if (this.dying) {
-      clip = 'enemy2Attack';
-      frame = frameForClip('enemy2Attack', this.deathTime, 10, 'once').index;
+      clip = 'exploderAttack';
+      frame = frameForClip('exploderAttack', this.deathTime, 10, 'once').index;
     } else if (this.attacking) {
-      clip = 'enemy2Attack';
-      frame = frameForClip('enemy2Attack', this.attackTime, 12, 'once').index;
+      clip = 'exploderAttack';
+      frame = frameForClip('exploderAttack', this.attackTime, 12, 'once').index;
     }
 
     if (spriteReady(clip)) {

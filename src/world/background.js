@@ -71,14 +71,14 @@ function mulberry32(seed) {
 }
 
 /** Taburkan bintik-bintik kecil di rumput biar tidak polos. */
-function drawGrassSpeckle(ctx, p) {
+function drawGrassSpeckle(ctx, palette) {
   const rand = mulberry32(1337);
   const count = 3000; // Ditingkatkan untuk peta 1200x1200
   for (let i = 0; i < count; i++) {
     const x = rand() * WORLD_W;
     const y = rand() * WORLD_H;
     const size = 1.5 + rand() * 2.5;
-    const color = p.grassSpeckle[Math.floor(rand() * p.grassSpeckle.length)];
+    const color = palette.grassSpeckle[Math.floor(rand() * palette.grassSpeckle.length)];
     ctx.globalAlpha = 0.25 + rand() * 0.35;
     ctx.fillStyle = color;
     ctx.beginPath();
@@ -89,31 +89,31 @@ function drawGrassSpeckle(ctx, p) {
 }
 
 /** Gambar pohon sederhana (dipakai sebelum gambar pohon dimuat). */
-function drawTree(ctx, x, y, r, p) {
-  ctx.fillStyle = p.treeShadow;
+function drawTree(ctx, x, y, r, palette) {
+  ctx.fillStyle = palette.treeShadow;
   ctx.beginPath();
   ctx.ellipse(x + r * 0.15, y + r * 0.3, r * 0.9, r * 0.45, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = p.treeCanopy;
+  ctx.fillStyle = palette.treeCanopy;
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = p.treeHighlight;
+  ctx.fillStyle = palette.treeHighlight;
   ctx.beginPath();
   ctx.arc(x - r * 0.3, y - r * 0.3, r * 0.4, 0, Math.PI * 2);
   ctx.fill();
 }
 
 /** Gambar batu sederhana (dipakai sebelum gambar batu dimuat). */
-function drawRock(ctx, x, y, r, p) {
-  ctx.fillStyle = p.rockShadow;
+function drawRock(ctx, x, y, r, palette) {
+  ctx.fillStyle = palette.rockShadow;
   ctx.beginPath();
   ctx.ellipse(x + r * 0.2, y + r * 0.25, r * 0.9, r * 0.5, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = p.rockBase;
+  ctx.fillStyle = palette.rockBase;
   ctx.beginPath();
   ctx.moveTo(x - r, y);
   ctx.quadraticCurveTo(x - r * 0.8, y - r, x, y - r * 0.9);
@@ -122,7 +122,7 @@ function drawRock(ctx, x, y, r, p) {
   ctx.quadraticCurveTo(x - r * 0.9, y + r * 0.7, x - r, y);
   ctx.fill();
 
-  ctx.fillStyle = p.rockHighlight;
+  ctx.fillStyle = palette.rockHighlight;
   ctx.beginPath();
   ctx.ellipse(x - r * 0.2, y - r * 0.3, r * 0.35, r * 0.2, -0.4, 0, Math.PI * 2);
   ctx.fill();
@@ -137,27 +137,27 @@ const cache = { day: null, night: null };
  */
 function buildCache(isNight) {
   const key = isNight ? 'night' : 'day';
-  const p = PALETTE[key];
+  const palette = PALETTE[key];
   const off = document.createElement('canvas');
   off.width = WORLD_W;
   off.height = WORLD_H;
   const ctx = off.getContext('2d');
 
-  ctx.fillStyle = p.grassBase;
+  ctx.fillStyle = palette.grassBase;
   ctx.fillRect(0, 0, WORLD_W, WORLD_H);
 
-  drawGrassSpeckle(ctx, p);
+  drawGrassSpeckle(ctx, palette);
 
   ctx.globalAlpha = 0.5;
   const patches = [
-    [100, 100, 45, 25, p.grassPatchA], [350, 200, 50, 30, p.grassPatchB],
-    [700, 150, 40, 22, p.grassPatchA], [1050, 250, 48, 28, p.grassPatchB],
-    [200, 450, 42, 24, p.grassPatchB], [600, 500, 55, 32, p.grassPatchA],
-    [950, 550, 45, 26, p.grassPatchA], [1100, 850, 50, 30, p.grassPatchB],
-    [150, 800, 48, 28, p.grassPatchA], [450, 900, 42, 25, p.grassPatchB],
-    [750, 1050, 52, 30, p.grassPatchA], [1000, 1100, 40, 22, p.grassPatchB],
-    [500, 150, 38, 20, p.grassPatchA], [850, 350, 44, 26, p.grassPatchB],
-    [300, 650, 46, 28, p.grassPatchA], [700, 750, 40, 24, p.grassPatchB],
+    [100, 100, 45, 25, palette.grassPatchA], [350, 200, 50, 30, palette.grassPatchB],
+    [700, 150, 40, 22, palette.grassPatchA], [1050, 250, 48, 28, palette.grassPatchB],
+    [200, 450, 42, 24, palette.grassPatchB], [600, 500, 55, 32, palette.grassPatchA],
+    [950, 550, 45, 26, palette.grassPatchA], [1100, 850, 50, 30, palette.grassPatchB],
+    [150, 800, 48, 28, palette.grassPatchA], [450, 900, 42, 25, palette.grassPatchB],
+    [750, 1050, 52, 30, palette.grassPatchA], [1000, 1100, 40, 22, palette.grassPatchB],
+    [500, 150, 38, 20, palette.grassPatchA], [850, 350, 44, 26, palette.grassPatchB],
+    [300, 650, 46, 28, palette.grassPatchA], [700, 750, 40, 24, palette.grassPatchB],
   ];
   for (const [x, y, rx, ry, color] of patches) {
     ctx.fillStyle = color;
@@ -172,10 +172,10 @@ function buildCache(isNight) {
       if (spriteReady('rock')) {
         drawSprite(ctx, 'rock', o.x, o.y, o.r * 2.6);
       } else {
-        drawRock(ctx, o.x, o.y, o.r, p);
+        drawRock(ctx, o.x, o.y, o.r, palette);
       }
     } else if (o.type === 'tree' && !spriteReady('tree')) {
-      drawTree(ctx, o.x, o.y, o.r, p);
+      drawTree(ctx, o.x, o.y, o.r, palette);
     }
   }
 
@@ -196,11 +196,37 @@ function buildCache(isNight) {
   cache[key] = off;
 }
 
-/** Tempel latar ke layar (dibuat dulu saat pertama kali), lalu pohon yang bergoyang. */
-export function drawBackground(ctx, isNight) {
+/**
+ * Bangun latar siang & malam sekaligus, di muka. Wajib dipanggil SETELAH
+ * preloadSprites(): buildCache membaca spriteReady() untuk memilih gambar atau
+ * bentuk primitif, dan hasilnya permanen.
+ *
+ * Tanpa ini, latar malam baru dibangun pada frame pertama level 3 — 3000 bintik
+ * rumput digambar di tengah permainan dan game tersendat persis saat level
+ * terakhir dimulai.
+ */
+export function prebuildBackgrounds() {
+  if (!cache.day) buildCache(false);
+  if (!cache.night) buildCache(true);
+}
+
+/**
+ * Tempel latar ke layar (dibuat dulu saat pertama kali), lalu pohon bergoyang.
+ *
+ * Yang ditempel HANYA potongan seluas pandangan kamera, bukan seluruh latar
+ * 1200x1200. Isi layar sama persis (sisanya toh terpotong clip), tapi tiap
+ * frame browser cuma mengurus ~0.25 juta piksel, bukan 1.44 juta.
+ *
+ * camX/camY & viewW/viewH dikirim dari game.js, tidak diambil dari config.js,
+ * supaya file ini tidak perlu meng-import config.js — config.js sendiri
+ * meng-import WORLD_W/WORLD_H dari sini, dan itu akan jadi impor melingkar.
+ */
+export function drawBackground(ctx, isNight, camX, camY, viewW, viewH) {
   const key = isNight ? 'night' : 'day';
   if (!cache[key]) buildCache(isNight);
-  ctx.drawImage(cache[key], 0, 0);
+  // Posisi sumber & tujuan sengaja sama: keduanya dalam koordinat dunia, dan
+  // transform kamera di game.js yang memindahkannya ke layar.
+  ctx.drawImage(cache[key], camX, camY, viewW, viewH, camX, camY, viewW, viewH);
   drawTreesAnimated(ctx, isNight);
 }
 

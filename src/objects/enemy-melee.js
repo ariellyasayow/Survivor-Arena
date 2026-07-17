@@ -1,16 +1,17 @@
 // =============================================
-//  enemy.js — Musuh 1: pengejar jarak dekat
+//  enemy-melee.js — Musuh melee: pengejar jarak dekat
 // =============================================
 // Musuh yang mengejar player, lalu berhenti dan memukul saat sudah dekat.
 // Pukulannya melukai tepat di saat ayunan senjata (sekali tiap gerakan serang).
 //
-// Musuh 2 dan 3 (enemy2.js, enemy3.js) memakai beberapa fungsi yang sama
-// persis dengan file ini: mengurangi darah, menandai kalah, dan memulai
-// animasi mati. Penjelasan lengkapnya ada di sini; file mereka hanya memuat
-// bagian yang berbeda.
+// Musuh exploder & laser memakai beberapa fungsi yang sama persis dengan file
+// ini: mengurangi darah, menandai kalah, dan memulai animasi mati. Penjelasan
+// lengkapnya ada di sini; file mereka hanya memuat bagian yang berbeda.
+// (Ketiganya class terpisah tanpa pewarisan — sengaja, biar tiap jenis musuh
+// bisa diubah tanpa memengaruhi yang lain.)
 import { drawSprite, frameForClip, spriteReady } from '../utils/assets.js';
 
-let enemyIdCounter = 0;
+let meleeIdCounter = 0;
 
 const ATTACK_TRIGGER_DIST = 20; // jarak "sangat dekat" untuk mulai menyerang
 // Siklus animasi attack: 9 frame @ 10fps = 0.9s. Damage terjadi saat ayunan
@@ -21,11 +22,11 @@ const ATTACK_DURATION = ATTACK_FRAMES / ATTACK_FPS; // 0.9s
 const ATTACK_HIT_TIME = 5 / ATTACK_FPS;             // 0.5s
 const ATTACK_HIT_RANGE = 26; // jangkauan sabetan saat momen damage
 
-export class Enemy {
+export class MeleeEnemy {
   // x, y = tempat muncul; hp = darah; damage = kekuatan pukulan;
   // speed = kecepatan gerak.
   constructor(x, y, hp, damage, speed) {
-    this.id = enemyIdCounter++;
+    this.id = meleeIdCounter++;
     this.x = x;
     this.y = y;
     this.r = 11;
@@ -147,7 +148,7 @@ export class Enemy {
   /** Sudah boleh dihapus dari game (animasi matinya sudah selesai). */
   isGone() {
     if (!this.dying) return false;
-    if (!spriteReady('enemyDeath')) return true;
+    if (!spriteReady('meleeDeath')) return true;
     return this.deathTime >= 0.9; // 9 frame @ 10fps
   }
 
@@ -158,14 +159,14 @@ export class Enemy {
     const size = this.r * 4.2;
 
     // Pilih klip
-    let clip = 'enemyRun';
-    let frame = frameForClip('enemyRun', this.clipTime, 12, 'loop').index;
+    let clip = 'meleeRun';
+    let frame = frameForClip('meleeRun', this.clipTime, 12, 'loop').index;
     if (this.dying) {
-      clip = 'enemyDeath';
-      frame = frameForClip('enemyDeath', this.deathTime, 10, 'once').index;
+      clip = 'meleeDeath';
+      frame = frameForClip('meleeDeath', this.deathTime, 10, 'once').index;
     } else if (this.attacking) {
-      clip = 'enemyAttack';
-      frame = frameForClip('enemyAttack', this.attackTime, ATTACK_FPS, 'once').index;
+      clip = 'meleeAttack';
+      frame = frameForClip('meleeAttack', this.attackTime, ATTACK_FPS, 'once').index;
     }
 
     if (spriteReady(clip)) {
@@ -180,7 +181,7 @@ export class Enemy {
         ctx.restore();
       }
     } else {
-      // Fallback primitif (dipakai selama sprite belum ada di assets/spritesheets/).
+      // Fallback primitif (dipakai selama sprite belum ada di src/assets/spritesheets/).
       ctx.fillStyle = flashing ? '#FFFFFF' : '#7B3FE4';
       ctx.beginPath();
       ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);

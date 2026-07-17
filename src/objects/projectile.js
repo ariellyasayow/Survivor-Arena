@@ -27,8 +27,8 @@ export class Projectile {
     this.r = 4;
     this.dead = false;
     this.isEnemy = isEnemy; // true = projectile dari enemy, false = dari player
-    this.isLaser = false;   // di-set true oleh game.js untuk laser enemy3
-    this._laserSpeedApplied = false;
+    this.isLaser = false;   // di-set true oleh game.js untuk laser musuh laser
+    this.laserSpeedApplied = false;
     return this;
   }
 
@@ -36,12 +36,12 @@ export class Projectile {
   update(dt) {
     // --- MODIFIKASI KECEPATAN LASER ---
     // Diperlambat dari 520 ke 260 px/detik agar seimbang[cite: 4]
-    if (this.isLaser && !this._laserSpeedApplied) {
+    if (this.isLaser && !this.laserSpeedApplied) {
       this.speed = 260; 
       this.vx = this.dirX * this.speed;
       this.vy = this.dirY * this.speed;
       this.r = 5;
-      this._laserSpeedApplied = true;
+      this.laserSpeedApplied = true;
     }
     this.x += this.vx * dt;
     this.y += this.vy * dt;

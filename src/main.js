@@ -10,6 +10,7 @@ import { preloadSprites } from './utils/assets.js';
 import { setMaxParticles } from './effects/vfx.js';
 import { setRenderQuality } from './quality.js';
 import { resizeViewport } from './viewport.js';
+import { prebuildBackgrounds } from './world/background.js';
 import { MAX_PARTICLES_HIGH, MAX_PARTICLES_LOW } from './config.js';
 import { initTutorial, notifyInput, isBlockingGameplay, reposition as repositionTutorial } from './tutorial.js';
 
@@ -39,19 +40,16 @@ if (deviceQuality === 'medium') {
 }
 
 const canvas = document.getElementById('game-canvas');
+const stage = document.getElementById('game-stage');
 
 // ---- Sesuaikan ukuran layar & ikuti perubahannya --------------------------
-resizeViewport(canvas);
+resizeViewport(canvas, stage);
 window.addEventListener('resize', () => {
-  resizeViewport(canvas);
+  resizeViewport(canvas, stage);
   repositionTutorial();
 });
 
 const game = new Game(canvas);
-
-// Muat semua gambar dulu sebelum game mulai, biar tidak ada gambar yang
-// muncul mendadak di tengah permainan. Aman walau gambarnya belum ada.
-await preloadSprites();
 
 // ---- Kontrol keyboard (buat main di komputer) ------------------------------
 const keys = { up: false, down: false, left: false, right: false };
@@ -154,8 +152,25 @@ canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 // ---- Tutorial "Cara Main" --------------------------------------------------
 // Panduan yang menyorot tiap bagian tampilan lalu diakhiri latihan gerak
-// (selengkapnya di js/tutorial.js).
+// (selengkapnya di src/tutorial.js).
 initTutorial(canvas);
+
+// ---- Peringatan orientasi --------------------------------------------------
+// Saat layar mendatar & pendek, style.css menutup layar dengan pesan "putar
+// perangkatmu". Permainan ikut dijeda di sini — kalau tidak, musuh terus
+// menyerang di balik pesan yang menutupi layar dan pemain kehabisan nyawa tanpa
+// bisa melihat apa pun.
+//
+// PENTING: batas layar ini harus sama persis dengan media query di style.css.
+const landscapeQuery = window.matchMedia('(orientation: landscape) and (max-height: 500px)');
+let blockedByOrientation = landscapeQuery.matches;
+
+const onOrientationChange = (e) => { blockedByOrientation = e.matches; };
+if (landscapeQuery.addEventListener) {
+  landscapeQuery.addEventListener('change', onOrientationChange);
+} else {
+  landscapeQuery.addListener(onOrientationChange); // Safari lama
+}
 
 /** Satukan joystick + keyboard jadi satu arah gerak. */
 function currentInputVector() {
@@ -178,28 +193,68 @@ function currentInputVector() {
 // ---- Perulangan utama game -------------------------------------------------
 let lastTime = -1;
 
-/** Perulangan utama: baca kontrol, perbarui game (kecuali dijeda tutorial), gambar. */
+/**
+ * Perulangan utama: baca kontrol, perbarui game (kecuali dijeda tutorial), gambar.
+ *
+ * Dua hal di bawah menjaga game tetap hidup walau ada yang error:
+ * 1. Frame berikutnya dijadwalkan di baris PERTAMA, bukan terakhir. Kalau
+ *    dijadwalkan terakhir, satu error di tengah loop membuat baris itu tak
+ *    pernah jalan — rantai frame putus dan game membeku selamanya.
+ * 2. Isi loop dibungkus try/catch, jadi frame yang error cuma dilewati.
+ */
 function loop(now) {
-  // Frame pertama atau baru balik dari tab lain: lewati sekali biar game tidak
-  // melompat karena jeda waktunya kelewat besar.
-  if (lastTime < 0 || now - lastTime > 500) {
+  requestAnimationFrame(loop);
+
+  try {
+    // Frame pertama atau baru balik dari tab lain: lewati sekali biar game tidak
+    // melompat karena jeda waktunya kelewat besar.
+    if (lastTime < 0 || now - lastTime > 500) {
+      lastTime = now;
+      return;
+    }
+
+    // dt = selisih waktu sejak frame lalu (detik). Dibatasi biar tidak melonjak.
+    const dt = Math.min(0.05, (now - lastTime) / 1000);
     lastTime = now;
-    requestAnimationFrame(loop);
-    return;
+
+    const input = currentInputVector();
+    notifyInput(input.x, input.y);
+    // Game dijeda saat tutorial sedang menjelaskan bagian tampilan (biar pemain
+    // bisa fokus membaca) dan saat layar mendatar (pesan "putar perangkatmu"
+    // sedang menutupi game). Tampilannya tetap digambar supaya layar tidak
+    // kosong saat jedanya selesai.
+    if (!isBlockingGameplay() && !blockedByOrientation) game.update(dt, input);
+    game.render();
+  } catch (err) {
+    // Lewati frame ini saja; frame berikutnya sudah antre di atas.
+    console.error('Frame dilewati karena error:', err);
   }
+}
 
-  // dt = selisih waktu sejak frame lalu (detik). Dibatasi biar tidak melonjak.
-  const dt = Math.min(0.05, (now - lastTime) / 1000);
-  lastTime = now;
+// ---- Titik mulai -----------------------------------------------------------
+/**
+ * Muat aset, siapkan latar, buka tombol Mulai, lalu jalankan game.
+ *
+ * Sengaja dibungkus fungsi async dan bukan `await` di tingkat atas file:
+ * top-level await butuh Chrome 89 / iOS 15 ke atas, dan di bawah itu file ini
+ * gagal dibaca sama sekali — layar hitam tanpa pesan, sebelum satu pun
+ * penjagaan error di dalamnya sempat berjalan.
+ */
+async function start() {
+  // Muat semua gambar dulu sebelum game mulai, biar tidak ada gambar yang
+  // muncul mendadak di tengah permainan. Aman walau gambarnya belum ada.
+  await preloadSprites();
 
-  const input = currentInputVector();
-  notifyInput(input.x, input.y);
-  // Saat tutorial sedang menjelaskan bagian tampilan, game dijeda biar pemain
-  // bisa fokus membaca. Tampilannya tetap digambar supaya layar tidak kosong.
-  if (!isBlockingGameplay()) game.update(dt, input);
-  game.render();
+  // Siapkan latar siang & malam sekarang, selagi layar pembuka masih tampil.
+  // Urutannya penting: harus setelah preloadSprites() (lihat background.js).
+  prebuildBackgrounds();
+
+  // Baru sekarang tombol "Mulai" boleh ditekan. Kalau bisa ditekan lebih awal,
+  // layar pembuka hilang tapi game belum bisa menggambar apa pun — pemain cuma
+  // melihat layar hitam sampai pemuatan selesai.
+  game.markReady();
 
   requestAnimationFrame(loop);
 }
 
-requestAnimationFrame(loop);
+start();
